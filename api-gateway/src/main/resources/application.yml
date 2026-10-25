@@ -1,0 +1,17 @@
+server:
+  port: ${PORT:8080}
+
+spring:
+  threads:
+    virtual:
+      enabled: true
+  application:
+    name: api-gateway
+
+moses:
+  frontend-origin: ${FRONTEND_ORIGIN:http://localhost:5173}
+  routes:
+    ingestion-service: ${INGESTION_SERVICE_URL:http://localhost:8081}
+    search-service: ${SEARCH_SERVICE_URL:http://localhost:8082}
+    process-monitor-service: ${PROCESS_MONITOR_SERVICE_URL:http://localhost:8083}
+    ai-service: ${AI_SERVICE_URL:http://localhost:8084}

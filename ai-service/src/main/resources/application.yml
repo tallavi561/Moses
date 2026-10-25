@@ -1,0 +1,13 @@
+server:
+  port: ${PORT:8084}
+
+spring:
+  threads:
+    virtual:
+      enabled: true
+  application:
+    name: ai-service
+
+moses:
+  search-service:
+    url: ${SEARCH_SERVICE_URL:http://localhost:8082}

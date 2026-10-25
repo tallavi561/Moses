@@ -1,0 +1,102 @@
+# Render blueprint for all 6 MoSes services.
+#
+# IMPORTANT: Render has no native MongoDB offering - MONGODB_URI must point at an
+# external cluster (e.g. MongoDB Atlas free tier). Set it manually per service in
+# the Render dashboard (marked sync: false below) after the first deploy.
+#
+# fromService env vars let services discover each other's Render-assigned URLs
+# automatically, so no hardcoded internal hostnames are needed.
+
+services:
+  - type: web
+    name: ingestion-service
+    env: docker
+    dockerfilePath: ./ingestion-service/Dockerfile
+    dockerContext: .
+    plan: free
+    envVars:
+      - key: MONGODB_URI
+        sync: false
+      - key: FLUSH_INTERVAL_SECONDS
+        value: "5"
+      - key: BUCKET_GRANULARITY_MINUTES
+        value: "1"
+      - key: RETENTION_DAYS
+        value: "14"
+
+  - type: web
+    name: search-service
+    env: docker
+    dockerfilePath: ./search-service/Dockerfile
+    dockerContext: .
+    plan: free
+    envVars:
+      - key: MONGODB_URI
+        sync: false
+      - key: BUCKET_GRANULARITY_MINUTES
+        value: "1"
+
+  - type: web
+    name: process-monitor-service
+    env: docker
+    dockerfilePath: ./process-monitor-service/Dockerfile
+    dockerContext: .
+    plan: free
+    envVars:
+      - key: MONGODB_URI
+        sync: false
+
+  - type: web
+    name: ai-service
+    env: docker
+    dockerfilePath: ./ai-service/Dockerfile
+    dockerContext: .
+    plan: free
+    envVars:
+      - key: SEARCH_SERVICE_URL
+        fromService:
+          type: web
+          name: search-service
+          property: hostport
+
+  - type: web
+    name: api-gateway
+    env: docker
+    dockerfilePath: ./api-gateway/Dockerfile
+    dockerContext: .
+    plan: free
+    envVars:
+      - key: INGESTION_SERVICE_URL
+        fromService:
+          type: web
+          name: ingestion-service
+          property: hostport
+      - key: SEARCH_SERVICE_URL
+        fromService:
+          type: web
+          name: search-service
+          property: hostport
+      - key: PROCESS_MONITOR_SERVICE_URL
+        fromService:
+          type: web
+          name: process-monitor-service
+          property: hostport
+      - key: AI_SERVICE_URL
+        fromService:
+          type: web
+          name: ai-service
+          property: hostport
+      - key: FRONTEND_ORIGIN
+        sync: false # set to the deployed frontend's URL once it's known
+
+  - type: web
+    name: moses-monitor-frontend
+    env: static
+    buildCommand: cd frontend && npm install && npm run build
+    staticPublishPath: ./frontend/dist
+    envVars:
+      - key: VITE_API_BASE_URL
+        fromService:
+          type: web
+          name: api-gateway
+          property: hostport

@@ -1,0 +1,12 @@
+server:
+  port: ${PORT:8083}
+
+spring:
+  threads:
+    virtual:
+      enabled: true
+  application:
+    name: process-monitor-service
+  data:
+    mongodb:
+      uri: ${MONGODB_URI:mongodb://localhost:27017/moses_monitor}

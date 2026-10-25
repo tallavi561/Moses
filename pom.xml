@@ -1,0 +1,24 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<project xmlns="http://maven.apache.org/POM/4.0.0"
+         xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+         xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 https://maven.apache.org/xsd/maven-4.0.0.xsd">
+    <modelVersion>4.0.0</modelVersion>
+
+    <groupId>com.moses</groupId>
+    <artifactId>moses-monitor-parent</artifactId>
+    <version>0.1.0</version>
+    <packaging>pom</packaging>
+    <name>moses-monitor-parent</name>
+    <description>Aggregator for all MoSes monitoring microservices (build ordering only; each
+        module keeps spring-boot-starter-parent as its own Maven parent so every service stays
+        independently deployable).</description>
+
+    <modules>
+        <module>common</module>
+        <module>ingestion-service</module>
+        <module>search-service</module>
+        <module>process-monitor-service</module>
+        <module>ai-service</module>
+        <module>api-gateway</module>
+    </modules>
+</project>

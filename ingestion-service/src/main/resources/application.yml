@@ -1,0 +1,25 @@
+server:
+  port: ${PORT:8081}
+
+spring:
+  threads:
+    virtual:
+      enabled: true
+  application:
+    name: ingestion-service
+  data:
+    mongodb:
+      uri: ${MONGODB_URI:mongodb://localhost:27017/moses_monitor}
+
+moses:
+  ingestion:
+    flush-interval-seconds: ${FLUSH_INTERVAL_SECONDS:5}
+  index:
+    bucket-granularity-minutes: ${BUCKET_GRANULARITY_MINUTES:1}
+  retention:
+    days: ${RETENTION_DAYS:14}
+
+logging:
+  level:
+    root: INFO
+    com.moses.monitor: DEBUG

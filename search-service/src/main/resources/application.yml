@@ -1,0 +1,21 @@
+server:
+  port: ${PORT:8082}
+
+spring:
+  threads:
+    virtual:
+      enabled: true
+  application:
+    name: search-service
+  data:
+    mongodb:
+      uri: ${MONGODB_URI:mongodb://localhost:27017/moses_monitor}
+
+moses:
+  index:
+    bucket-granularity-minutes: ${BUCKET_GRANULARITY_MINUTES:1}
+
+logging:
+  level:
+    root: INFO
+    com.moses.monitor: DEBUG

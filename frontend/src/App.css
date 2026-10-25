@@ -1,0 +1,39 @@
+.app {
+  max-width: 1100px;
+  margin: 0 auto;
+  padding: 1rem;
+}
+
+header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 1rem;
+}
+
+nav button {
+  margin-left: 0.5rem;
+}
+
+table {
+  width: 100%;
+  border-collapse: collapse;
+  margin-top: 1rem;
+}
+
+th,
+td {
+  border: 1px solid #444;
+  padding: 4px 8px;
+  text-align: left;
+  font-size: 0.85rem;
+}
+
+section {
+  margin-bottom: 1rem;
+}
+
+input {
+  margin-right: 0.5rem;
+  padding: 4px 8px;
+}
