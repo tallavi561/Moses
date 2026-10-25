@@ -2,14 +2,12 @@ import { createContext, useContext, useEffect, useState, type ReactNode } from "
 import { strings, type Lang, type Strings } from "./strings";
 
 const STORAGE_KEY = "moses.lang";
-const RTL_LANGS: Lang[] = ["he"];
 
 interface LanguageContextValue {
   lang: Lang;
   t: Strings;
   setLang: (lang: Lang) => void;
   toggleLang: () => void;
-  dir: "rtl" | "ltr";
 }
 
 const LanguageContext = createContext<LanguageContextValue | null>(null);
@@ -26,12 +24,15 @@ function readStoredLang(): Lang {
 
 export function LanguageProvider({ children }: { children: ReactNode }) {
   const [lang, setLangState] = useState<Lang>(readStoredLang);
-  const dir = RTL_LANGS.includes(lang) ? "rtl" : "ltr";
 
   useEffect(() => {
+    // Only the <html lang> attribute changes - the layout direction stays LTR
+    // regardless of language (sidebar position etc. don't mirror). Hebrew text
+    // still renders right-to-left on its own via the browser's normal bidi
+    // handling of Hebrew characters; this just stops the whole page from
+    // flipping when the admin toggles the UI language.
     document.documentElement.lang = lang;
-    document.documentElement.dir = dir;
-  }, [lang, dir]);
+  }, [lang]);
 
   function setLang(next: Lang) {
     setLangState(next);
@@ -47,7 +48,7 @@ export function LanguageProvider({ children }: { children: ReactNode }) {
   }
 
   return (
-    <LanguageContext.Provider value={{ lang, t: strings[lang], setLang, toggleLang, dir }}>
+    <LanguageContext.Provider value={{ lang, t: strings[lang], setLang, toggleLang }}>
       {children}
     </LanguageContext.Provider>
   );

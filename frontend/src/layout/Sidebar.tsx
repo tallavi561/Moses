@@ -11,7 +11,7 @@ interface SidebarProps {
 }
 
 export default function Sidebar({ state, onCollapseToggle, onHide }: SidebarProps) {
-  const { t, dir } = useLanguage();
+  const { t } = useLanguage();
   const expanded = state === "expanded";
 
   if (state === "hidden") return null;
@@ -29,7 +29,7 @@ export default function Sidebar({ state, onCollapseToggle, onHide }: SidebarProp
           </div>
         )}
         <button className="icon-btn" onClick={onCollapseToggle} title={expanded ? "Collapse" : "Expand"}>
-          <IconChevron direction={expanded ? "start" : "end"} style={{ transform: dir === "rtl" ? "scaleX(-1)" : undefined }} />
+          <IconChevron direction={expanded ? "start" : "end"} />
         </button>
       </div>
 
