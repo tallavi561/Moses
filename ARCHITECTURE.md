@@ -84,7 +84,7 @@ worth naming so they don't surprise later:
 | `process-monitor-service` | Process/service heartbeats, current topology for the flow diagram | **Skeleton** - heartbeat ingest + state read-back only, no history/alerting yet |
 | `ai-service` | NL query → structured search-service call; anomaly detection; summarization | **Skeleton** - NL→query pipeline works end-to-end with a rule-based (non-LLM) translator; anomaly-check and summarize endpoints return 501 Not Implemented |
 | `api-gateway` | Single public entry point, reverse proxy, CORS | **Fully implemented** |
-| `frontend` | React UI: structured search, NL search, flow diagram | **Skeleton** - functional, minimal styling |
+| `frontend` | React UI: sidebar nav, search, flow diagram, settings | **Shell built per UX spec** (frontend/מסמך אפיון.docx) - collapsible sidebar, EN/HE i18n (English default, layout never mirrors to RTL - only text changes), dark-default theme with manual toggle. Dashboard/Uploads are "coming soon" stubs |
 
 ## 3. The search algorithm (owner-designed, see project_specification.md)
 
@@ -202,8 +202,9 @@ through `api-gateway`, matching the real deployed topology.
 
 **Not yet done:**
 - Actual deployment to Render (services + `render.yaml` are ready; needs a
-  MongoDB Atlas cluster + Render account wiring)
-- git init / remote repo (nothing has been pushed anywhere yet)
+  MongoDB Atlas cluster + Render account wiring). Pushed to
+  [github.com/tallavi561/Moses](https://github.com/tallavi561/Moses), `main` branch,
+  but nothing is deployed anywhere yet - everything so far has run locally.
 - Real LLM integration for NL query understanding (currently a rule-based stub)
 - Anomaly detection and summarization logic (currently 501 stubs)
 - A real heartbeat-sending agent for monitored services (process-monitor-service
