@@ -1,5 +1,8 @@
 server:
-  port: ${PORT:8080}
+  # 8080 is reserved for Render's default PORT only; locally it was already
+  # occupied by an unrelated process on this machine, so the local default
+  # is 8085 instead. Render always overrides this via the PORT env var.
+  port: ${PORT:8085}
 
 spring:
   threads:

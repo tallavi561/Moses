@@ -16,7 +16,7 @@ inverted-index search algorithm.
 | `search-service` | 8082 | Search (macro-filter → intersection → micro-filter) |
 | `process-monitor-service` | 8083 | Process/service heartbeats + flow state |
 | `ai-service` | 8084 | NL query → search, anomaly/summarization (skeleton) |
-| `api-gateway` | 8080 | Public entry point, reverse proxy + CORS |
+| `api-gateway` | 8085 (local) / `PORT` on Render | Public entry point, reverse proxy + CORS |
 | `frontend` | 5173 (dev) | React UI (search + flow diagram) |
 
 ## Running locally
