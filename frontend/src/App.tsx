@@ -10,18 +10,32 @@ export default function App() {
 
   return (
     <div className="app">
-      <header>
-        <h1>MoSes Monitor</h1>
-        <nav>
-          <button onClick={() => setTab("search")} disabled={tab === "search"}>
-            Search
+      <header className="app-header">
+        <div className="app-title">
+          <div className="logo">MS</div>
+          <div>
+            <h1>MoSes Monitor</h1>
+            <p className="subtitle">ניטור לוגים ותהליכים חכם</p>
+          </div>
+        </div>
+
+        <nav className="tabs">
+          <button
+            className={`tab-button ${tab === "search" ? "active" : ""}`}
+            onClick={() => setTab("search")}
+          >
+            חיפוש
           </button>
-          <button onClick={() => setTab("flow")} disabled={tab === "flow"}>
-            Flow
+          <button
+            className={`tab-button ${tab === "flow" ? "active" : ""}`}
+            onClick={() => setTab("flow")}
+          >
+            זרימת מערכת
           </button>
         </nav>
       </header>
-      <main>{tab === "search" ? <SearchView /> : <FlowView />}</main>
+
+      <main className="app-main">{tab === "search" ? <SearchView /> : <FlowView />}</main>
     </div>
   );
 }
