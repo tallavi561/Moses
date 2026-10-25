@@ -1,21 +1,33 @@
 import { useState } from "react";
 import { askAi, searchLogs, type LogEntry } from "../api";
+import { useLanguage, pluralize } from "../i18n/LanguageContext";
 
-const LEVEL_INFO: Record<number, { label: string; className: string }> = {
-  0: { label: "TRACE", className: "badge-muted" },
-  1: { label: "DEBUG", className: "badge-muted" },
-  2: { label: "INFO", className: "badge-info" },
-  3: { label: "WARN", className: "badge-warn" },
-  4: { label: "ERROR", className: "badge-danger" },
-  5: { label: "FATAL", className: "badge-danger" },
+const LEVEL_LABEL: Record<number, string> = {
+  0: "TRACE",
+  1: "DEBUG",
+  2: "INFO",
+  3: "WARN",
+  4: "ERROR",
+  5: "FATAL",
+};
+
+const LEVEL_CLASS: Record<number, string> = {
+  0: "badge-muted",
+  1: "badge-muted",
+  2: "badge-info",
+  3: "badge-warn",
+  4: "badge-danger",
+  5: "badge-danger",
 };
 
 function LevelBadge({ level }: { level: number }) {
-  const info = LEVEL_INFO[level] ?? { label: String(level), className: "badge-muted" };
-  return <span className={`badge ${info.className}`}>{info.label}</span>;
+  return (
+    <span className={`badge ${LEVEL_CLASS[level] ?? "badge-muted"}`}>{LEVEL_LABEL[level] ?? String(level)}</span>
+  );
 }
 
-export default function SearchView() {
+export default function SearchPage() {
+  const { t, lang } = useLanguage();
   const [wordsInput, setWordsInput] = useState("");
   const [nlQuestion, setNlQuestion] = useState("");
   const [results, setResults] = useState<LogEntry[] | null>(null);
@@ -26,7 +38,7 @@ export default function SearchView() {
   async function runStructuredSearch() {
     const words = wordsInput.split(/\s+/).filter(Boolean);
     if (words.length === 0) {
-      setError("יש להזין לפחות מילת חיפוש אחת");
+      setError(t.search.needsWord);
       return;
     }
     setLoading(true);
@@ -38,7 +50,7 @@ export default function SearchView() {
       const res = await searchLogs(words, from, to);
       setResults(res);
     } catch (e) {
-      setError(`החיפוש נכשל: ${(e as Error).message}`);
+      setError(`${t.search.errorPrefix}: ${(e as Error).message}`);
       setResults(null);
     } finally {
       setLoading(false);
@@ -47,7 +59,7 @@ export default function SearchView() {
 
   async function runNlQuery() {
     if (!nlQuestion.trim()) {
-      setError("יש להזין שאלה");
+      setError(t.search.needsQuestion);
       return;
     }
     setLoading(true);
@@ -58,7 +70,7 @@ export default function SearchView() {
       const typed = res as { results?: LogEntry[] };
       setResults(typed.results ?? []);
     } catch (e) {
-      setError(`שאילתת ה-AI נכשלה: ${(e as Error).message}`);
+      setError(`${t.search.aiErrorPrefix}: ${(e as Error).message}`);
       setResults(null);
     } finally {
       setLoading(false);
@@ -72,35 +84,35 @@ export default function SearchView() {
   return (
     <>
       <div className="card">
-        <h2>חיפוש מובנה</h2>
-        <p className="hint">חיפוש AND של מילים ב-24 השעות האחרונות, על פני כל הלוגים</p>
+        <h2>{t.search.structuredTitle}</h2>
+        <p className="hint">{t.search.structuredHint}</p>
         <div className="search-row">
           <input
             type="text"
             value={wordsInput}
             onChange={(e) => setWordsInput(e.target.value)}
             onKeyDown={(e) => handleKeyDown(e, runStructuredSearch)}
-            placeholder="לדוגמה: failed token"
+            placeholder={t.search.placeholderStructured}
           />
           <button className="btn" onClick={runStructuredSearch} disabled={loading}>
-            חפש
+            {t.search.searchButton}
           </button>
         </div>
       </div>
 
       <div className="card">
-        <h2>שאלה בשפה חופשית</h2>
-        <p className="hint">שירות ה-AI יפרש את השאלה ויריץ חיפוש מתאים</p>
+        <h2>{t.search.nlTitle}</h2>
+        <p className="hint">{t.search.nlHint}</p>
         <div className="search-row">
           <input
             type="text"
             value={nlQuestion}
             onChange={(e) => setNlQuestion(e.target.value)}
             onKeyDown={(e) => handleKeyDown(e, runNlQuery)}
-            placeholder="לדוגמה: תראה לי שגיאות בשירות ה-auth"
+            placeholder={t.search.placeholderNl}
           />
           <button className="btn btn-secondary" onClick={runNlQuery} disabled={loading}>
-            שאל
+            {t.search.askButton}
           </button>
         </div>
       </div>
@@ -110,33 +122,35 @@ export default function SearchView() {
       {(results !== null || loading) && (
         <div className="card results-card">
           <div className="results-header">
-            <h2>{lastMode === "ai" ? "תוצאות (AI)" : "תוצאות חיפוש"}</h2>
+            <h2>{lastMode === "ai" ? t.search.resultsTitleAi : t.search.resultsTitle}</h2>
             {!loading && results !== null && (
               <span className="results-count">
-                {results.length} {results.length === 1 ? "תוצאה" : "תוצאות"}
+                {pluralize(t.search.results_one, t.search.results_other, results.length)}
               </span>
             )}
           </div>
 
           {loading || results === null ? (
-            <div className="loading-row">טוען...</div>
+            <div className="loading-row">{t.search.loading}</div>
           ) : results.length === 0 ? (
-            <div className="empty-state">לא נמצאו לוגים התואמים לחיפוש</div>
+            <div className="empty-state">{t.search.empty}</div>
           ) : (
             <table>
               <thead>
                 <tr>
-                  <th>זמן</th>
-                  <th>שירות</th>
-                  <th>רמה</th>
-                  <th>IP</th>
-                  <th>הודעה</th>
+                  <th>{t.search.columns.time}</th>
+                  <th>{t.search.columns.service}</th>
+                  <th>{t.search.columns.level}</th>
+                  <th>{t.search.columns.ip}</th>
+                  <th>{t.search.columns.message}</th>
                 </tr>
               </thead>
               <tbody>
                 {results.map((log) => (
-                  <tr key={log.logId}>
-                    <td className="timestamp-cell">{new Date(log.timestamp).toLocaleString("he-IL")}</td>
+                  <tr key={log.logId} className="result-row">
+                    <td className="timestamp-cell">
+                      {new Date(log.timestamp).toLocaleString(lang === "he" ? "he-IL" : "en-US")}
+                    </td>
                     <td>{log.serviceName}</td>
                     <td>
                       <LevelBadge level={log.logLevel} />

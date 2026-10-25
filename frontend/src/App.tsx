@@ -1,41 +1,28 @@
-import { useState } from "react";
-import SearchView from "./components/SearchView";
-import FlowView from "./components/FlowView";
+import { Navigate, Route, Routes } from "react-router-dom";
+import { LanguageProvider } from "./i18n/LanguageContext";
+import { ThemeProvider } from "./theme/ThemeContext";
+import Layout from "./layout/Layout";
+import SearchPage from "./pages/SearchPage";
+import FlowPage from "./pages/FlowPage";
+import SettingsPage from "./pages/SettingsPage";
+import ComingSoonPage from "./pages/ComingSoonPage";
 import "./App.css";
 
-type Tab = "search" | "flow";
-
 export default function App() {
-  const [tab, setTab] = useState<Tab>("search");
-
   return (
-    <div className="app">
-      <header className="app-header">
-        <div className="app-title">
-          <div className="logo">MS</div>
-          <div>
-            <h1>MoSes Monitor</h1>
-            <p className="subtitle">ניטור לוגים ותהליכים חכם</p>
-          </div>
-        </div>
-
-        <nav className="tabs">
-          <button
-            className={`tab-button ${tab === "search" ? "active" : ""}`}
-            onClick={() => setTab("search")}
-          >
-            חיפוש
-          </button>
-          <button
-            className={`tab-button ${tab === "flow" ? "active" : ""}`}
-            onClick={() => setTab("flow")}
-          >
-            זרימת מערכת
-          </button>
-        </nav>
-      </header>
-
-      <main className="app-main">{tab === "search" ? <SearchView /> : <FlowView />}</main>
-    </div>
+    <ThemeProvider>
+      <LanguageProvider>
+        <Routes>
+          <Route element={<Layout />}>
+            <Route index element={<Navigate to="/search" replace />} />
+            <Route path="/search" element={<SearchPage />} />
+            <Route path="/flow" element={<FlowPage />} />
+            <Route path="/dashboard" element={<ComingSoonPage />} />
+            <Route path="/uploads" element={<ComingSoonPage />} />
+            <Route path="/settings" element={<SettingsPage />} />
+          </Route>
+        </Routes>
+      </LanguageProvider>
+    </ThemeProvider>
   );
 }

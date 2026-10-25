@@ -2,22 +2,17 @@ import { useEffect, useMemo, useState } from "react";
 import ReactFlow, { Background, Controls, type Edge, type Node } from "reactflow";
 import "reactflow/dist/style.css";
 import { fetchProcessState, type ProcessState } from "../api";
+import { useLanguage } from "../i18n/LanguageContext";
 
 const STATUS_COLOR: Record<ProcessState["status"], string> = {
-  UP: "#16a34a",
-  DEGRADED: "#d97706",
-  DOWN: "#dc2626",
-  UNKNOWN: "#6b7280",
+  UP: "var(--up)",
+  DEGRADED: "var(--degraded)",
+  DOWN: "var(--down)",
+  UNKNOWN: "var(--unknown)",
 };
 
-const STATUS_LABEL: Record<ProcessState["status"], string> = {
-  UP: "פעיל",
-  DEGRADED: "מוחלש",
-  DOWN: "לא זמין",
-  UNKNOWN: "לא ידוע",
-};
-
-export default function FlowView() {
+export default function FlowPage() {
+  const { t } = useLanguage();
   const [states, setStates] = useState<ProcessState[]>([]);
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
@@ -55,7 +50,7 @@ export default function FlowView() {
         label: (
           <div className="flow-node" style={{ background: STATUS_COLOR[s.status] ?? STATUS_COLOR.UNKNOWN }}>
             <div className="node-service">{s.serviceName}</div>
-            <div className="node-status">{STATUS_LABEL[s.status] ?? s.status}</div>
+            <div className="node-status">{t.flow.status[s.status] ?? s.status}</div>
           </div>
         ),
       },
@@ -72,19 +67,19 @@ export default function FlowView() {
     );
 
     return { nodes, edges };
-  }, [states]);
+  }, [states, t]);
 
   return (
     <div className="card flow-card">
       <div className="flow-canvas">
         {error ? (
-          <div className="empty-state">שגיאה בטעינת מצב המערכת: {error}</div>
-        ) : loading ? (
-          <div className="loading-row">טוען מצב מערכת...</div>
-        ) : states.length === 0 ? (
           <div className="empty-state">
-            עדיין לא התקבלו heartbeats. יש לשלוח POST ל-/api/process/heartbeat כדי שהתרשים יתמלא.
+            {t.flow.errorPrefix}: {error}
           </div>
+        ) : loading ? (
+          <div className="loading-row">{t.flow.loading}</div>
+        ) : states.length === 0 ? (
+          <div className="empty-state">{t.flow.empty}</div>
         ) : (
           <ReactFlow nodes={nodes} edges={edges} fitView>
             <Background />
@@ -94,10 +89,10 @@ export default function FlowView() {
       </div>
 
       <div className="flow-legend">
-        {(Object.keys(STATUS_LABEL) as ProcessState["status"][]).map((status) => (
+        {(Object.keys(t.flow.status) as ProcessState["status"][]).map((status) => (
           <span key={status} className="legend-item">
             <span className="legend-dot" style={{ background: STATUS_COLOR[status] }} />
-            {STATUS_LABEL[status]}
+            {t.flow.status[status]}
           </span>
         ))}
       </div>
