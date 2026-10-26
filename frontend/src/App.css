@@ -40,14 +40,7 @@
   justify-content: center;
 }
 
-.sidebar-brand {
-  display: flex;
-  align-items: center;
-  gap: 10px;
-  min-width: 0;
-}
-
-.sidebar-brand .logo {
+.logo {
   width: 32px;
   height: 32px;
   flex-shrink: 0;
@@ -146,6 +139,105 @@
   color: var(--text);
 }
 
+/* ---------- Project switcher ---------- */
+
+.project-switcher {
+  position: relative;
+  flex: 1;
+  min-width: 0;
+}
+
+.project-switcher-trigger {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  width: 100%;
+  border: none;
+  background: transparent;
+  padding: 0;
+  cursor: pointer;
+  color: var(--text);
+  text-align: start;
+}
+
+.project-switcher-label {
+  min-width: 0;
+  flex: 1;
+}
+
+.project-switcher-chevron {
+  color: var(--text-muted);
+  font-size: 11px;
+  flex-shrink: 0;
+}
+
+.project-switcher-menu {
+  position: absolute;
+  top: calc(100% + 6px);
+  inset-inline-start: 0;
+  width: 240px;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  box-shadow: var(--shadow);
+  padding: 6px;
+  z-index: 30;
+}
+
+.project-switcher-menu-title {
+  font-size: 11px;
+  font-weight: 600;
+  color: var(--text-muted);
+  padding: 6px 10px;
+  text-transform: uppercase;
+}
+
+.project-switcher-empty {
+  font-size: 13px;
+  color: var(--text-muted);
+  padding: 6px 10px;
+}
+
+.project-switcher-item {
+  display: block;
+  width: 100%;
+  text-align: start;
+  border: none;
+  background: transparent;
+  color: var(--text);
+  padding: 8px 10px;
+  border-radius: 6px;
+  font-size: 13px;
+  cursor: pointer;
+}
+
+.project-switcher-item:hover {
+  background: var(--surface-muted);
+}
+
+.project-switcher-divider {
+  height: 1px;
+  background: var(--border);
+  margin: 6px 0;
+}
+
+.project-switcher-create {
+  display: flex;
+  gap: 6px;
+  padding: 4px;
+}
+
+.project-switcher-create input {
+  flex: 1;
+  min-width: 0;
+  padding: 7px 10px;
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  background: var(--bg);
+  color: var(--text);
+  font-size: 13px;
+}
+
 /* ---------- Top bar ---------- */
 
 .top-bar {
@@ -193,6 +285,53 @@
 
 .lang-toggle:hover {
   background: var(--border);
+}
+
+.top-bar-right {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.user-menu {
+  position: relative;
+}
+
+.user-menu-trigger {
+  border: none;
+  background: transparent;
+  padding: 0;
+  cursor: pointer;
+}
+
+.user-avatar {
+  width: 34px;
+  height: 34px;
+  border-radius: 50%;
+  background: var(--accent);
+  color: var(--accent-contrast);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 12px;
+  font-weight: 700;
+}
+
+.user-menu-dropdown {
+  position: absolute;
+  top: calc(100% + 8px);
+  inset-inline-end: 0;
+  width: 220px;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  box-shadow: var(--shadow);
+  padding: 6px;
+  z-index: 30;
+}
+
+.user-menu-info {
+  padding: 8px 10px;
 }
 
 /* ---------- Main content ---------- */
@@ -526,4 +665,84 @@ tr:last-child td {
     border-bottom: 1px solid var(--border);
     padding: 10px 0;
   }
+}
+
+/* ---------- Auth screen ---------- */
+
+.auth-screen {
+  min-height: 100vh;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 24px;
+}
+
+.auth-card {
+  width: 100%;
+  max-width: 360px;
+  text-align: center;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 8px;
+}
+
+.auth-logo {
+  width: 48px;
+  height: 48px;
+  font-size: 17px;
+  margin-bottom: 8px;
+}
+
+.auth-card .btn {
+  width: 100%;
+  margin-top: 8px;
+}
+
+.mock-notice {
+  font-size: 12px;
+  color: var(--text-muted);
+  margin-top: 12px;
+}
+
+/* ---------- Projects screen ---------- */
+
+.projects-screen {
+  max-width: 640px;
+  margin: 0 auto;
+  padding: 40px 24px;
+  display: flex;
+  flex-direction: column;
+  gap: 20px;
+}
+
+.projects-header {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+}
+
+.projects-header h1 {
+  font-size: 20px;
+  margin: 0 0 4px;
+}
+
+.project-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.project-list-item {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 12px 14px;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  background: var(--surface-muted);
+  font-size: 14px;
 }

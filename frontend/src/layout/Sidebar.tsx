@@ -2,6 +2,7 @@ import { NavLink } from "react-router-dom";
 import { useLanguage } from "../i18n/LanguageContext";
 import { IconChevron, IconHide } from "../icons";
 import { NAV_ITEMS } from "./navItems";
+import ProjectSwitcher from "./ProjectSwitcher";
 import type { SidebarState } from "./useSidebarState";
 
 interface SidebarProps {
@@ -19,15 +20,7 @@ export default function Sidebar({ state, onCollapseToggle, onHide }: SidebarProp
   return (
     <aside className={`sidebar ${expanded ? "expanded" : "collapsed"}`}>
       <div className="sidebar-top">
-        {expanded && (
-          <div className="sidebar-brand">
-            <div className="logo">MS</div>
-            <div>
-              <div className="brand-name">{t.appName}</div>
-              <div className="brand-tagline">{t.appTagline}</div>
-            </div>
-          </div>
-        )}
+        <ProjectSwitcher expanded={expanded} />
         <button className="icon-btn" onClick={onCollapseToggle} title={expanded ? "Collapse" : "Expand"}>
           <IconChevron direction={expanded ? "start" : "end"} />
         </button>

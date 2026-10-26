@@ -1,5 +1,6 @@
 import { useLanguage } from "../i18n/LanguageContext";
 import { IconGlobe, IconMenu } from "../icons";
+import UserMenu from "./UserMenu";
 import type { SidebarState } from "./useSidebarState";
 
 interface TopBarProps {
@@ -20,10 +21,13 @@ export default function TopBar({ sidebarState, onShowSidebar }: TopBarProps) {
         )}
       </div>
 
-      <button className="lang-toggle" onClick={toggleLang} title="Toggle language">
-        <IconGlobe />
-        <span>{lang === "en" ? "English" : "עברית"}</span>
-      </button>
+      <div className="top-bar-right">
+        <button className="lang-toggle" onClick={toggleLang} title="Toggle language">
+          <IconGlobe />
+          <span>{lang === "en" ? "English" : "עברית"}</span>
+        </button>
+        <UserMenu />
+      </div>
     </header>
   );
 }
