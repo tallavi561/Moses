@@ -42,6 +42,22 @@ export async function fetchProcessState(): Promise<ProcessState[]> {
   return res.json();
 }
 
+export interface HeartbeatPayload {
+  serviceName: string;
+  status: ProcessState["status"];
+  processName?: string;
+  calls?: string[];
+}
+
+export async function postHeartbeat(payload: HeartbeatPayload): Promise<void> {
+  const res = await fetch(`${API_BASE_URL}/api/process/heartbeat`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(payload),
+  });
+  if (!res.ok) throw new Error(`Failed to add service: ${res.status}`);
+}
+
 export async function askAi(question: string): Promise<unknown> {
   const res = await fetch(`${API_BASE_URL}/api/ai/query`, {
     method: "POST",

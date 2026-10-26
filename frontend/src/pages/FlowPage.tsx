@@ -1,8 +1,9 @@
-import { useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import ReactFlow, { Background, Controls, type Edge, type Node } from "reactflow";
 import "reactflow/dist/style.css";
-import { fetchProcessState, type ProcessState } from "../api";
+import { fetchProcessState, postHeartbeat, type ProcessState } from "../api";
 import { useLanguage } from "../i18n/LanguageContext";
+import AddServiceForm from "../components/AddServiceForm";
 
 const STATUS_COLOR: Record<ProcessState["status"], string> = {
   UP: "var(--up)",
@@ -17,30 +18,28 @@ export default function FlowPage() {
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
 
-  useEffect(() => {
-    let cancelled = false;
-
-    async function poll() {
-      try {
-        const data = await fetchProcessState();
-        if (!cancelled) {
-          setStates(data);
-          setError(null);
-        }
-      } catch (e) {
-        if (!cancelled) setError((e as Error).message);
-      } finally {
-        if (!cancelled) setLoading(false);
-      }
+  const refresh = useCallback(async () => {
+    try {
+      const data = await fetchProcessState();
+      setStates(data);
+      setError(null);
+    } catch (e) {
+      setError((e as Error).message);
+    } finally {
+      setLoading(false);
     }
-
-    poll();
-    const interval = setInterval(poll, 5000);
-    return () => {
-      cancelled = true;
-      clearInterval(interval);
-    };
   }, []);
+
+  useEffect(() => {
+    refresh();
+    const interval = setInterval(refresh, 5000);
+    return () => clearInterval(interval);
+  }, [refresh]);
+
+  async function handleAddService(serviceName: string, status: ProcessState["status"], calls: string[]) {
+    await postHeartbeat({ serviceName, status, calls: calls.length > 0 ? calls : undefined });
+    await refresh();
+  }
 
   const { nodes, edges } = useMemo(() => {
     const nodes: Node[] = states.map((s, i) => ({
@@ -70,32 +69,36 @@ export default function FlowPage() {
   }, [states, t]);
 
   return (
-    <div className="card flow-card">
-      <div className="flow-canvas">
-        {error ? (
-          <div className="empty-state">
-            {t.flow.errorPrefix}: {error}
-          </div>
-        ) : loading ? (
-          <div className="loading-row">{t.flow.loading}</div>
-        ) : states.length === 0 ? (
-          <div className="empty-state">{t.flow.empty}</div>
-        ) : (
-          <ReactFlow nodes={nodes} edges={edges} fitView>
-            <Background />
-            <Controls showInteractive={false} />
-          </ReactFlow>
-        )}
-      </div>
+    <>
+      <AddServiceForm existingServices={states.map((s) => s.serviceName)} onAdd={handleAddService} />
 
-      <div className="flow-legend">
-        {(Object.keys(t.flow.status) as ProcessState["status"][]).map((status) => (
-          <span key={status} className="legend-item">
-            <span className="legend-dot" style={{ background: STATUS_COLOR[status] }} />
-            {t.flow.status[status]}
-          </span>
-        ))}
+      <div className="card flow-card">
+        <div className="flow-canvas">
+          {error ? (
+            <div className="empty-state">
+              {t.flow.errorPrefix}: {error}
+            </div>
+          ) : loading ? (
+            <div className="loading-row">{t.flow.loading}</div>
+          ) : states.length === 0 ? (
+            <div className="empty-state">{t.flow.empty}</div>
+          ) : (
+            <ReactFlow nodes={nodes} edges={edges} fitView>
+              <Background />
+              <Controls showInteractive={false} />
+            </ReactFlow>
+          )}
+        </div>
+
+        <div className="flow-legend">
+          {(Object.keys(t.flow.status) as ProcessState["status"][]).map((status) => (
+            <span key={status} className="legend-item">
+              <span className="legend-dot" style={{ background: STATUS_COLOR[status] }} />
+              {t.flow.status[status]}
+            </span>
+          ))}
+        </div>
       </div>
-    </div>
+    </>
   );
 }

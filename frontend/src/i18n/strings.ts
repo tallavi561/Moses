@@ -44,7 +44,7 @@ export const strings = {
     },
     flow: {
       loading: "Loading system state...",
-      empty: "No heartbeats received yet. POST to /api/process/heartbeat to populate this view.",
+      empty: "No services added yet.",
       errorPrefix: "Failed to load system state",
       status: {
         UP: "Up",
@@ -52,6 +52,16 @@ export const strings = {
         DOWN: "Down",
         UNKNOWN: "Unknown",
       },
+      addService: "Add service",
+      addServiceTitle: "Add a service",
+      addServiceHint: "Manually registers a node - until there's a real agent sending heartbeats, this is the way to describe your system's flow.",
+      serviceNamePlaceholder: "Service name, e.g. auth-service",
+      callsLabel: "Calls (optional)",
+      callsHint: "Select the other services this one calls, to draw an edge",
+      add: "Add",
+      cancel: "Cancel",
+      needsName: "Enter a service name",
+      addFailed: "Failed to add service",
     },
     settings: {
       title: "Settings",
@@ -121,7 +131,7 @@ export const strings = {
     },
     flow: {
       loading: "טוען מצב מערכת...",
-      empty: "עדיין לא התקבלו heartbeats. יש לשלוח POST ל-/api/process/heartbeat כדי שהתרשים יתמלא.",
+      empty: "עדיין לא נוספו שירותים.",
       errorPrefix: "שגיאה בטעינת מצב המערכת",
       status: {
         UP: "פעיל",
@@ -129,6 +139,16 @@ export const strings = {
         DOWN: "לא זמין",
         UNKNOWN: "לא ידוע",
       },
+      addService: "הוסף שירות",
+      addServiceTitle: "הוספת שירות",
+      addServiceHint: "רישום ידני של צומת - עד שיהיה agent אמיתי ששולח heartbeats, זו הדרך לתאר את ה-flow של המערכת שלך.",
+      serviceNamePlaceholder: "שם השירות, לדוגמה: auth-service",
+      callsLabel: "קורא ל- (אופציונלי)",
+      callsHint: "בחר אילו שירותים אחרים השירות הזה קורא להם, כדי לצייר קשת",
+      add: "הוסף",
+      cancel: "בטל",
+      needsName: "יש להזין שם שירות",
+      addFailed: "הוספת השירות נכשלה",
     },
     settings: {
       title: "הגדרות",

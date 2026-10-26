@@ -746,3 +746,41 @@ tr:last-child td {
   background: var(--surface-muted);
   font-size: 14px;
 }
+
+/* ---------- Add-service form ---------- */
+
+.status-select {
+  padding: 10px 14px;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  background: var(--bg);
+  color: var(--text);
+  font-size: 14px;
+}
+
+.calls-picker {
+  margin-top: 14px;
+}
+
+.calls-label {
+  font-size: 13px;
+  font-weight: 600;
+}
+
+.calls-options {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.calls-option {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 6px 12px;
+  border: 1px solid var(--border);
+  border-radius: 999px;
+  font-size: 13px;
+  cursor: pointer;
+  background: var(--bg);
+}
