@@ -26,8 +26,19 @@ function LevelBadge({ level }: { level: number }) {
   );
 }
 
+type SearchMode = "structured" | "ai";
+
+const SEARCH_MODE_KEY = "moses.search.mode";
+
 export default function SearchPage() {
   const { t, lang } = useLanguage();
+  const [searchMode, setSearchMode] = useState<SearchMode>(() => {
+    try {
+      return localStorage.getItem(SEARCH_MODE_KEY) === "ai" ? "ai" : "structured";
+    } catch {
+      return "structured";
+    }
+  });
   const [wordsInput, setWordsInput] = useState("");
   const [nlQuestion, setNlQuestion] = useState("");
   const [results, setResults] = useState<LogEntry[] | null>(null);
@@ -81,41 +92,73 @@ export default function SearchPage() {
     if (e.key === "Enter") action();
   }
 
+  function changeSearchMode(next: SearchMode) {
+    setSearchMode(next);
+    try {
+      localStorage.setItem(SEARCH_MODE_KEY, next);
+    } catch {
+      // ignore
+    }
+  }
+
   return (
     <>
-      <div className="card">
-        <h2>{t.search.structuredTitle}</h2>
-        <p className="hint">{t.search.structuredHint}</p>
-        <div className="search-row">
-          <input
-            type="text"
-            value={wordsInput}
-            onChange={(e) => setWordsInput(e.target.value)}
-            onKeyDown={(e) => handleKeyDown(e, runStructuredSearch)}
-            placeholder={t.search.placeholderStructured}
-          />
-          <button className="btn" onClick={runStructuredSearch} disabled={loading}>
-            {t.search.searchButton}
-          </button>
-        </div>
+      <div className="mode-switch" role="radiogroup">
+        <button
+          type="button"
+          className={`mode-option ${searchMode === "structured" ? "active" : ""}`}
+          onClick={() => changeSearchMode("structured")}
+          aria-pressed={searchMode === "structured"}
+        >
+          {t.search.structuredTitle}
+        </button>
+        <button
+          type="button"
+          className={`mode-option ${searchMode === "ai" ? "active" : ""}`}
+          onClick={() => changeSearchMode("ai")}
+          aria-pressed={searchMode === "ai"}
+        >
+          {t.search.nlTitle}
+        </button>
       </div>
 
-      <div className="card">
-        <h2>{t.search.nlTitle}</h2>
-        <p className="hint">{t.search.nlHint}</p>
-        <div className="search-row">
-          <input
-            type="text"
-            value={nlQuestion}
-            onChange={(e) => setNlQuestion(e.target.value)}
-            onKeyDown={(e) => handleKeyDown(e, runNlQuery)}
-            placeholder={t.search.placeholderNl}
-          />
-          <button className="btn btn-secondary" onClick={runNlQuery} disabled={loading}>
-            {t.search.askButton}
-          </button>
+      {searchMode === "structured" ? (
+        <div className="card">
+          <h2>{t.search.structuredTitle}</h2>
+          <p className="hint">{t.search.structuredHint}</p>
+          <div className="search-row">
+            <input
+              type="text"
+              autoFocus
+              value={wordsInput}
+              onChange={(e) => setWordsInput(e.target.value)}
+              onKeyDown={(e) => handleKeyDown(e, runStructuredSearch)}
+              placeholder={t.search.placeholderStructured}
+            />
+            <button className="btn" onClick={runStructuredSearch} disabled={loading}>
+              {t.search.searchButton}
+            </button>
+          </div>
         </div>
-      </div>
+      ) : (
+        <div className="card">
+          <h2>{t.search.nlTitle}</h2>
+          <p className="hint">{t.search.nlHint}</p>
+          <div className="search-row">
+            <input
+              type="text"
+              autoFocus
+              value={nlQuestion}
+              onChange={(e) => setNlQuestion(e.target.value)}
+              onKeyDown={(e) => handleKeyDown(e, runNlQuery)}
+              placeholder={t.search.placeholderNl}
+            />
+            <button className="btn btn-secondary" onClick={runNlQuery} disabled={loading}>
+              {t.search.askButton}
+            </button>
+          </div>
+        </div>
+      )}
 
       {error && <div className="alert-error">{error}</div>}
 
