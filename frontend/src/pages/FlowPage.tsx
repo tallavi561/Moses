@@ -292,7 +292,12 @@ export default function FlowPage() {
             </ReactFlow>
           </div>
         ) : (
-          <ArchitectureListView states={states} connections={connections} onEditNode={setEditingNode} />
+          <ArchitectureListView
+            states={states}
+            connections={connections}
+            onEditNode={setEditingNode}
+            onEditConnection={setEditingConnection}
+          />
         )}
 
         {view === "graph" && !error && !loading && states.length > 0 && (

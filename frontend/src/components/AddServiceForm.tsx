@@ -1,6 +1,7 @@
 import { useState } from "react";
 import type { ProcessState } from "../api";
 import { useLanguage } from "../i18n/LanguageContext";
+import ConnectionsPicker from "./ConnectionsPicker";
 
 interface AddServiceFormProps {
   existingServices: string[];
@@ -18,10 +19,6 @@ export default function AddServiceForm({ existingServices, onAdd }: AddServiceFo
   const [calls, setCalls] = useState<string[]>([]);
   const [error, setError] = useState<string | null>(null);
   const [submitting, setSubmitting] = useState(false);
-
-  function toggleCall(service: string) {
-    setCalls((prev) => (prev.includes(service) ? prev.filter((s) => s !== service) : [...prev, service]));
-  }
 
   function reset() {
     setName("");
@@ -94,18 +91,7 @@ export default function AddServiceForm({ existingServices, onAdd }: AddServiceFo
       </div>
 
       {existingServices.length > 0 && (
-        <div className="calls-picker">
-          <div className="calls-label">{t.flow.callsLabel}</div>
-          <p className="hint">{t.flow.callsHint}</p>
-          <div className="calls-options">
-            {existingServices.map((service) => (
-              <label key={service} className="calls-option">
-                <input type="checkbox" checked={calls.includes(service)} onChange={() => toggleCall(service)} />
-                {service}
-              </label>
-            ))}
-          </div>
-        </div>
+        <ConnectionsPicker selected={calls} available={existingServices} onChange={setCalls} />
       )}
 
       {error && <div className="alert-error">{error}</div>}

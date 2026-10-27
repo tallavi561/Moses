@@ -2,6 +2,7 @@ import { useState } from "react";
 import type { ProcessState } from "../api";
 import { useLanguage } from "../i18n/LanguageContext";
 import Modal from "./Modal";
+import ConnectionsPicker from "./ConnectionsPicker";
 
 interface EditNodeFormProps {
   node: ProcessState;
@@ -22,10 +23,6 @@ export default function EditNodeForm({ node, otherServiceNames, initialConnectio
   const [connections, setConnections] = useState<string[]>(initialConnections);
   const [error, setError] = useState<string | null>(null);
   const [submitting, setSubmitting] = useState(false);
-
-  function toggleConnection(service: string) {
-    setConnections((prev) => (prev.includes(service) ? prev.filter((s) => s !== service) : [...prev, service]));
-  }
 
   async function handleSave() {
     const trimmed = name.trim();
@@ -84,18 +81,7 @@ export default function EditNodeForm({ node, otherServiceNames, initialConnectio
       </div>
 
       {otherServiceNames.length > 0 && (
-        <div className="calls-picker">
-          <div className="calls-label">{t.flow.callsLabel}</div>
-          <p className="hint">{t.flow.callsHint}</p>
-          <div className="calls-options">
-            {otherServiceNames.map((service) => (
-              <label key={service} className="calls-option">
-                <input type="checkbox" checked={connections.includes(service)} onChange={() => toggleConnection(service)} />
-                {service}
-              </label>
-            ))}
-          </div>
-        </div>
+        <ConnectionsPicker selected={connections} available={otherServiceNames} onChange={setConnections} />
       )}
 
       {error && <div className="alert-error">{error}</div>}

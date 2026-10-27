@@ -939,3 +939,59 @@ tr:last-child td {
   color: var(--text-muted);
   flex-basis: 100%;
 }
+
+.arch-connection-item.clickable {
+  cursor: pointer;
+  background: var(--surface-muted);
+  border: none;
+  width: 100%;
+  text-align: start;
+  font-family: inherit;
+}
+
+.arch-connection-item.clickable:hover {
+  background: var(--border);
+}
+
+/* ---------- Connections picker (chips + add dropdown) ---------- */
+
+.connection-chips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-bottom: 10px;
+}
+
+.connection-chip {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 6px 8px 6px 12px;
+  border-radius: 999px;
+  background: var(--accent);
+  color: var(--accent-contrast);
+  font-size: 13px;
+}
+
+.connection-chip-remove {
+  border: none;
+  background: rgba(0, 0, 0, 0.2);
+  color: inherit;
+  width: 18px;
+  height: 18px;
+  border-radius: 50%;
+  line-height: 1;
+  cursor: pointer;
+  font-size: 14px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.connection-chip-remove:hover {
+  background: rgba(0, 0, 0, 0.35);
+}
+
+.connection-add-select {
+  width: 100%;
+}

@@ -7,6 +7,7 @@ interface ArchitectureListViewProps {
   states: ProcessState[];
   connections: Connection[];
   onEditNode: (node: ProcessState) => void;
+  onEditConnection: (connection: Connection) => void;
 }
 
 const STATUS_COLOR: Record<ProcessState["status"], string> = {
@@ -16,7 +17,7 @@ const STATUS_COLOR: Record<ProcessState["status"], string> = {
   UNKNOWN: "var(--unknown)",
 };
 
-export default function ArchitectureListView({ states, connections, onEditNode }: ArchitectureListViewProps) {
+export default function ArchitectureListView({ states, connections, onEditNode, onEditConnection }: ArchitectureListViewProps) {
   const { t } = useLanguage();
   const [expanded, setExpanded] = useState<string | null>(null);
 
@@ -62,10 +63,16 @@ export default function ArchitectureListView({ states, connections, onEditNode }
                 ) : (
                   <ul className="arch-connections">
                     {relatedConnections.map((c) => (
-                      <li key={c.id} className="arch-connection-item">
-                        <span className="arch-connection-direction">{connectionLabel(c)}</span>
-                        {c.communicationType && <span className="arch-connection-type">{c.communicationType}</span>}
-                        {c.description && <span className="arch-connection-description">{c.description}</span>}
+                      <li key={c.id}>
+                        <button
+                          type="button"
+                          className="arch-connection-item clickable"
+                          onClick={() => onEditConnection(c)}
+                        >
+                          <span className="arch-connection-direction">{connectionLabel(c)}</span>
+                          {c.communicationType && <span className="arch-connection-type">{c.communicationType}</span>}
+                          {c.description && <span className="arch-connection-description">{c.description}</span>}
+                        </button>
                       </li>
                     ))}
                   </ul>
