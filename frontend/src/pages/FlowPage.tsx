@@ -1,5 +1,14 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
-import ReactFlow, { Background, Controls, MarkerType, type Edge, type Node } from "reactflow";
+import ReactFlow, {
+  Background,
+  Controls,
+  MarkerType,
+  useNodesState,
+  type Edge,
+  type Node,
+  type NodeMouseHandler,
+  type XYPosition,
+} from "reactflow";
 import "reactflow/dist/style.css";
 import {
   deleteConnection,
@@ -14,6 +23,7 @@ import {
   type ProcessState,
 } from "../api";
 import { useLanguage } from "../i18n/LanguageContext";
+import { useProjects } from "../projects/ProjectsContext";
 import AddServiceForm from "../components/AddServiceForm";
 import EditNodeForm from "../components/EditNodeForm";
 import EditConnectionForm from "../components/EditConnectionForm";
@@ -25,14 +35,40 @@ const STATUS_COLOR: Record<ProcessState["status"], string> = {
   UNKNOWN: "var(--unknown)",
 };
 
+function defaultPosition(index: number): XYPosition {
+  return { x: (index % 5) * 200, y: Math.floor(index / 5) * 140 };
+}
+
+function loadPositions(key: string): Record<string, XYPosition> {
+  try {
+    const stored = localStorage.getItem(key);
+    if (stored) return JSON.parse(stored);
+  } catch {
+    // ignore corrupt/unavailable storage
+  }
+  return {};
+}
+
+function savePositions(key: string, positions: Record<string, XYPosition>) {
+  try {
+    localStorage.setItem(key, JSON.stringify(positions));
+  } catch {
+    // ignore
+  }
+}
+
 export default function FlowPage() {
   const { t } = useLanguage();
+  const { currentProjectId } = useProjects();
+  const positionsKey = `moses.flow.positions.${currentProjectId ?? "default"}`;
+
   const [states, setStates] = useState<ProcessState[]>([]);
   const [connections, setConnections] = useState<Connection[]>([]);
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
   const [editingNode, setEditingNode] = useState<ProcessState | null>(null);
   const [editingConnection, setEditingConnection] = useState<Connection | null>(null);
+  const [nodes, setNodes, onNodesChange] = useNodesState<{ label: React.ReactNode }>([]);
 
   const refresh = useCallback(async () => {
     try {
@@ -53,6 +89,43 @@ export default function FlowPage() {
     return () => clearInterval(interval);
   }, [refresh]);
 
+  // Rebuild node objects whenever the backend state or language changes, but keep
+  // whatever position each node currently has on screen (drag position wins over
+  // a stored/default one) so polling doesn't snap dragged nodes back.
+  useEffect(() => {
+    const storedPositions = loadPositions(positionsKey);
+    setNodes((prevNodes) => {
+      const prevById = new Map(prevNodes.map((n) => [n.id, n]));
+      return states.map((s, i) => {
+        const existing = prevById.get(s.serviceName);
+        const position = existing?.position ?? storedPositions[s.serviceName] ?? defaultPosition(i);
+        return {
+          id: s.serviceName,
+          position,
+          data: {
+            label: (
+              <div className="flow-node" style={{ background: STATUS_COLOR[s.status] ?? STATUS_COLOR.UNKNOWN }}>
+                <div className="node-service">{s.serviceName}</div>
+                <div className="node-status">{t.flow.status[s.status] ?? s.status}</div>
+              </div>
+            ),
+          },
+          style: { background: "transparent", border: "none", padding: 0, width: "auto" },
+        };
+      });
+    });
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [states, t, positionsKey]);
+
+  const handleNodeDragStop: NodeMouseHandler = useCallback(
+    (_event, node) => {
+      const positions = loadPositions(positionsKey);
+      positions[node.id] = node.position;
+      savePositions(positionsKey, positions);
+    },
+    [positionsKey]
+  );
+
   async function handleAddService(serviceName: string, status: ProcessState["status"], connectionTargets: string[]) {
     await postHeartbeat({ serviceName, status, connections: connectionTargets.length > 0 ? connectionTargets : undefined });
     await refresh();
@@ -65,12 +138,23 @@ export default function FlowPage() {
       status,
       connections: connectionTargets.length > 0 ? connectionTargets : undefined,
     });
+    if (serviceName !== editingNode.serviceName) {
+      const positions = loadPositions(positionsKey);
+      if (positions[editingNode.serviceName]) {
+        positions[serviceName] = positions[editingNode.serviceName];
+        delete positions[editingNode.serviceName];
+        savePositions(positionsKey, positions);
+      }
+    }
     await refresh();
   }
 
   async function handleDeleteNode() {
     if (!editingNode) return;
     await deleteNode(editingNode.serviceName);
+    const positions = loadPositions(positionsKey);
+    delete positions[editingNode.serviceName];
+    savePositions(positionsKey, positions);
     await refresh();
   }
 
@@ -92,21 +176,7 @@ export default function FlowPage() {
     await refresh();
   }
 
-  const { nodes, edges } = useMemo(() => {
-    const nodes: Node[] = states.map((s, i) => ({
-      id: s.serviceName,
-      position: { x: (i % 5) * 200, y: Math.floor(i / 5) * 140 },
-      data: {
-        label: (
-          <div className="flow-node" style={{ background: STATUS_COLOR[s.status] ?? STATUS_COLOR.UNKNOWN }}>
-            <div className="node-service">{s.serviceName}</div>
-            <div className="node-status">{t.flow.status[s.status] ?? s.status}</div>
-          </div>
-        ),
-      },
-      style: { background: "transparent", border: "none", padding: 0, width: "auto" },
-    }));
-
+  const edges = useMemo(() => {
     const arrow = { type: MarkerType.ArrowClosed };
     const edges: Edge[] = connections.map((c) => ({
       id: c.id,
@@ -116,9 +186,8 @@ export default function FlowPage() {
       markerEnd: c.direction !== "TARGET_TO_SOURCE" ? arrow : undefined,
       markerStart: c.direction !== "SOURCE_TO_TARGET" ? arrow : undefined,
     }));
-
-    return { nodes, edges };
-  }, [states, connections, t]);
+    return edges;
+  }, [connections]);
 
   function handleNodeClick(_event: unknown, node: Node) {
     const state = states.find((s) => s.serviceName === node.id);
@@ -146,7 +215,15 @@ export default function FlowPage() {
           ) : states.length === 0 ? (
             <div className="empty-state">{t.flow.empty}</div>
           ) : (
-            <ReactFlow nodes={nodes} edges={edges} onNodeClick={handleNodeClick} onEdgeClick={handleEdgeClick} fitView>
+            <ReactFlow
+              nodes={nodes}
+              edges={edges}
+              onNodesChange={onNodesChange}
+              onNodeDragStop={handleNodeDragStop}
+              onNodeClick={handleNodeClick}
+              onEdgeClick={handleEdgeClick}
+              fitView
+            >
               <Background />
               <Controls showInteractive={false} />
             </ReactFlow>
