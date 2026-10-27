@@ -19,10 +19,10 @@ public class RouteConfig {
                         @Value("${moses.routes.search-service}") String searchUrl,
                         @Value("${moses.routes.process-monitor-service}") String processUrl,
                         @Value("${moses.routes.ai-service}") String aiUrl) {
-        routes.put("/api/logs", ingestionUrl);
-        routes.put("/api/search", searchUrl);
-        routes.put("/api/process", processUrl);
-        routes.put("/api/ai", aiUrl);
+        routes.put("/api/logs", normalize(ingestionUrl));
+        routes.put("/api/search", normalize(searchUrl));
+        routes.put("/api/process", normalize(processUrl));
+        routes.put("/api/ai", normalize(aiUrl));
     }
 
     /** Returns the backend base URL for the given request path, or null if no prefix matches. */
@@ -33,5 +33,17 @@ public class RouteConfig {
             }
         }
         return null;
+    }
+
+    /**
+     * Render's {@code fromService} "hostport" property yields a bare "host:port" with no scheme
+     * (unlike the "http://host:port" local defaults), which would otherwise be misparsed as a URI
+     * whose scheme is the hostname.
+     */
+    private static String normalize(String url) {
+        if (url == null || url.isBlank() || url.startsWith("http://") || url.startsWith("https://")) {
+            return url;
+        }
+        return "http://" + url;
     }
 }

@@ -25,7 +25,19 @@ public class NlQueryController {
                               @Value("${moses.search-service.url}") String searchServiceUrl) {
         this.translator = translator;
         this.restTemplate = restTemplate;
-        this.searchServiceUrl = searchServiceUrl;
+        this.searchServiceUrl = normalize(searchServiceUrl);
+    }
+
+    /**
+     * Render's {@code fromService} "hostport" property yields a bare "host:port" with no scheme
+     * (unlike the "http://host:port" local default), which {@link UriComponentsBuilder#fromHttpUrl}
+     * would otherwise reject.
+     */
+    private static String normalize(String url) {
+        if (url == null || url.isBlank() || url.startsWith("http://") || url.startsWith("https://")) {
+            return url;
+        }
+        return "http://" + url;
     }
 
     public record NlQueryRequest(@NotBlank String question) {

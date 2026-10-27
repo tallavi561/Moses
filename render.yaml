@@ -95,8 +95,10 @@ services:
     buildCommand: cd frontend && npm install && npm run build
     staticPublishPath: ./frontend/dist
     envVars:
+      # fromService/hostport only resolves to Render's private network, which the
+      # browser can't reach - and this is a build-time Vite var anyway, baked into
+      # the static bundle, not read at runtime. Set it to api-gateway's public
+      # https://*.onrender.com URL after that service's first deploy, then trigger
+      # a manual redeploy of this static site to pick it up.
       - key: VITE_API_BASE_URL
-        fromService:
-          type: web
-          name: api-gateway
-          property: hostport
+        sync: false
