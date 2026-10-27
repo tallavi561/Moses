@@ -19,7 +19,7 @@ const STATUS_COLOR: Record<ProcessState["status"], string> = {
 
 export default function ArchitectureListView({ states, connections, onEditNode, onEditConnection }: ArchitectureListViewProps) {
   const { t } = useLanguage();
-  const [expanded, setExpanded] = useState<string | null>(null);
+  const [expandedNode, setExpandedNode] = useState<string | null>(null);
 
   function connectionLabel(c: Connection) {
     const template =
@@ -32,60 +32,62 @@ export default function ArchitectureListView({ states, connections, onEditNode, 
   }
 
   return (
-    <div className="arch-list">
-      {states.map((node) => {
-        const relatedConnections = connections.filter(
-          (c) => c.sourceService === node.serviceName || c.targetService === node.serviceName
-        );
-        const isExpanded = expanded === node.serviceName;
+    <div className="arch-list-sections">
+      <section>
+        <h2 className="arch-section-title">{t.flow.listServicesTitle}</h2>
+        {states.length === 0 ? (
+          <p className="hint">{t.flow.listNoServices}</p>
+        ) : (
+          <div className="arch-list">
+            {states.map((node) => {
+              const isExpanded = expandedNode === node.serviceName;
+              return (
+                <div key={node.serviceName} className="arch-row">
+                  <button
+                    type="button"
+                    className="arch-row-header"
+                    onClick={() => setExpandedNode(isExpanded ? null : node.serviceName)}
+                    aria-expanded={isExpanded}
+                  >
+                    <IconChevron direction="end" className={`arch-row-chevron ${isExpanded ? "open" : ""}`} />
+                    <span className="legend-dot" style={{ background: STATUS_COLOR[node.status] ?? STATUS_COLOR.UNKNOWN }} />
+                    <span className="arch-row-name">{node.serviceName}</span>
+                    <span className="arch-row-status">{t.flow.status[node.status] ?? node.status}</span>
+                  </button>
 
-        return (
-          <div key={node.serviceName} className="arch-row">
-            <button
-              type="button"
-              className="arch-row-header"
-              onClick={() => setExpanded(isExpanded ? null : node.serviceName)}
-              aria-expanded={isExpanded}
-            >
-              <IconChevron direction="end" className={`arch-row-chevron ${isExpanded ? "open" : ""}`} />
-              <span className="legend-dot" style={{ background: STATUS_COLOR[node.status] ?? STATUS_COLOR.UNKNOWN }} />
-              <span className="arch-row-name">{node.serviceName}</span>
-              <span className="arch-row-status">{t.flow.status[node.status] ?? node.status}</span>
-            </button>
-
-            {isExpanded && (
-              <div className="arch-row-body">
-                <p className="arch-row-description">{node.description || t.flow.listNoDescription}</p>
-
-                <div className="calls-label">{t.flow.listConnectionsTitle}</div>
-                {relatedConnections.length === 0 ? (
-                  <p className="hint">{t.flow.listNoConnections}</p>
-                ) : (
-                  <ul className="arch-connections">
-                    {relatedConnections.map((c) => (
-                      <li key={c.id}>
-                        <button
-                          type="button"
-                          className="arch-connection-item clickable"
-                          onClick={() => onEditConnection(c)}
-                        >
-                          <span className="arch-connection-direction">{connectionLabel(c)}</span>
-                          {c.communicationType && <span className="arch-connection-type">{c.communicationType}</span>}
-                          {c.description && <span className="arch-connection-description">{c.description}</span>}
-                        </button>
-                      </li>
-                    ))}
-                  </ul>
-                )}
-
-                <button className="btn-secondary" onClick={() => onEditNode(node)}>
-                  {t.flow.listEditNode}
-                </button>
-              </div>
-            )}
+                  {isExpanded && (
+                    <div className="arch-row-body">
+                      <p className="arch-row-description">{node.description || t.flow.listNoDescription}</p>
+                      <button className="btn-secondary" onClick={() => onEditNode(node)}>
+                        {t.flow.listEditNode}
+                      </button>
+                    </div>
+                  )}
+                </div>
+              );
+            })}
           </div>
-        );
-      })}
+        )}
+      </section>
+
+      <section>
+        <h2 className="arch-section-title">{t.flow.listConnectionsTitle}</h2>
+        {connections.length === 0 ? (
+          <p className="hint">{t.flow.listNoConnections}</p>
+        ) : (
+          <ul className="arch-connections">
+            {connections.map((c) => (
+              <li key={c.id}>
+                <button type="button" className="arch-connection-item clickable" onClick={() => onEditConnection(c)}>
+                  <span className="arch-connection-direction">{connectionLabel(c)}</span>
+                  {c.communicationType && <span className="arch-connection-type">{c.communicationType}</span>}
+                  {c.description && <span className="arch-connection-description">{c.description}</span>}
+                </button>
+              </li>
+            ))}
+          </ul>
+        )}
+      </section>
     </div>
   );
 }
