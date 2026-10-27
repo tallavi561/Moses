@@ -1,9 +1,22 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
-import ReactFlow, { Background, Controls, type Edge, type Node } from "reactflow";
+import ReactFlow, { Background, Controls, MarkerType, type Edge, type Node } from "reactflow";
 import "reactflow/dist/style.css";
-import { fetchProcessState, postHeartbeat, type ProcessState } from "../api";
+import {
+  deleteConnection,
+  deleteNode,
+  fetchConnections,
+  fetchProcessState,
+  postHeartbeat,
+  updateConnection,
+  updateNode,
+  type Connection,
+  type ConnectionDirection,
+  type ProcessState,
+} from "../api";
 import { useLanguage } from "../i18n/LanguageContext";
 import AddServiceForm from "../components/AddServiceForm";
+import EditNodeForm from "../components/EditNodeForm";
+import EditConnectionForm from "../components/EditConnectionForm";
 
 const STATUS_COLOR: Record<ProcessState["status"], string> = {
   UP: "var(--up)",
@@ -15,13 +28,17 @@ const STATUS_COLOR: Record<ProcessState["status"], string> = {
 export default function FlowPage() {
   const { t } = useLanguage();
   const [states, setStates] = useState<ProcessState[]>([]);
+  const [connections, setConnections] = useState<Connection[]>([]);
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
+  const [editingNode, setEditingNode] = useState<ProcessState | null>(null);
+  const [editingConnection, setEditingConnection] = useState<Connection | null>(null);
 
   const refresh = useCallback(async () => {
     try {
-      const data = await fetchProcessState();
-      setStates(data);
+      const [nodeData, connectionData] = await Promise.all([fetchProcessState(), fetchConnections()]);
+      setStates(nodeData);
+      setConnections(connectionData);
       setError(null);
     } catch (e) {
       setError((e as Error).message);
@@ -36,8 +53,42 @@ export default function FlowPage() {
     return () => clearInterval(interval);
   }, [refresh]);
 
-  async function handleAddService(serviceName: string, status: ProcessState["status"], calls: string[]) {
-    await postHeartbeat({ serviceName, status, calls: calls.length > 0 ? calls : undefined });
+  async function handleAddService(serviceName: string, status: ProcessState["status"], connectionTargets: string[]) {
+    await postHeartbeat({ serviceName, status, connections: connectionTargets.length > 0 ? connectionTargets : undefined });
+    await refresh();
+  }
+
+  async function handleSaveNode(serviceName: string, status: ProcessState["status"], connectionTargets: string[]) {
+    if (!editingNode) return;
+    await updateNode(editingNode.serviceName, {
+      serviceName,
+      status,
+      connections: connectionTargets.length > 0 ? connectionTargets : undefined,
+    });
+    await refresh();
+  }
+
+  async function handleDeleteNode() {
+    if (!editingNode) return;
+    await deleteNode(editingNode.serviceName);
+    await refresh();
+  }
+
+  async function handleSaveConnection(direction: ConnectionDirection, communicationType: string, description: string) {
+    if (!editingConnection) return;
+    await updateConnection(editingConnection.id, {
+      sourceService: editingConnection.sourceService,
+      targetService: editingConnection.targetService,
+      direction,
+      communicationType: communicationType || undefined,
+      description: description || undefined,
+    });
+    await refresh();
+  }
+
+  async function handleDeleteConnection() {
+    if (!editingConnection) return;
+    await deleteConnection(editingConnection.id);
     await refresh();
   }
 
@@ -56,23 +107,35 @@ export default function FlowPage() {
       style: { background: "transparent", border: "none", padding: 0, width: "auto" },
     }));
 
-    const edges: Edge[] = states.flatMap((s) =>
-      (s.calls ?? []).map((target) => ({
-        id: `${s.serviceName}->${target}`,
-        source: s.serviceName,
-        target,
-        animated: true,
-      }))
-    );
+    const arrow = { type: MarkerType.ArrowClosed };
+    const edges: Edge[] = connections.map((c) => ({
+      id: c.id,
+      source: c.sourceService,
+      target: c.targetService,
+      animated: true,
+      markerEnd: c.direction !== "TARGET_TO_SOURCE" ? arrow : undefined,
+      markerStart: c.direction !== "SOURCE_TO_TARGET" ? arrow : undefined,
+    }));
 
     return { nodes, edges };
-  }, [states, t]);
+  }, [states, connections, t]);
+
+  function handleNodeClick(_event: unknown, node: Node) {
+    const state = states.find((s) => s.serviceName === node.id);
+    if (state) setEditingNode(state);
+  }
+
+  function handleEdgeClick(_event: unknown, edge: Edge) {
+    const connection = connections.find((c) => c.id === edge.id);
+    if (connection) setEditingConnection(connection);
+  }
 
   return (
     <>
       <AddServiceForm existingServices={states.map((s) => s.serviceName)} onAdd={handleAddService} />
 
       <div className="card flow-card">
+        <p className="hint">{t.flow.editNodeHint}</p>
         <div className="flow-canvas">
           {error ? (
             <div className="empty-state">
@@ -83,7 +146,7 @@ export default function FlowPage() {
           ) : states.length === 0 ? (
             <div className="empty-state">{t.flow.empty}</div>
           ) : (
-            <ReactFlow nodes={nodes} edges={edges} fitView>
+            <ReactFlow nodes={nodes} edges={edges} onNodeClick={handleNodeClick} onEdgeClick={handleEdgeClick} fitView>
               <Background />
               <Controls showInteractive={false} />
             </ReactFlow>
@@ -99,6 +162,25 @@ export default function FlowPage() {
           ))}
         </div>
       </div>
+
+      {editingNode && (
+        <EditNodeForm
+          node={editingNode}
+          otherServiceNames={states.map((s) => s.serviceName).filter((n) => n !== editingNode.serviceName)}
+          onSave={handleSaveNode}
+          onDelete={handleDeleteNode}
+          onClose={() => setEditingNode(null)}
+        />
+      )}
+
+      {editingConnection && (
+        <EditConnectionForm
+          connection={editingConnection}
+          onSave={handleSaveConnection}
+          onDelete={handleDeleteConnection}
+          onClose={() => setEditingConnection(null)}
+        />
+      )}
     </>
   );
 }

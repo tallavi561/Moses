@@ -5,12 +5,12 @@ import org.springframework.data.mongodb.core.mapping.Document;
 import org.springframework.data.mongodb.core.mapping.Field;
 
 import java.time.Instant;
-import java.util.List;
 
 /**
  * Latest known state of one monitored node (service/process). One document
  * per serviceName, upserted on every heartbeat. This is what the React flow
- * diagram reads to draw nodes + edges - edges come from "calls".
+ * diagram reads to draw nodes; edges come from the separate Connection
+ * documents (see {@link Connection}).
  */
 @Document(collection = "process_state")
 public class ProcessState {
@@ -29,10 +29,6 @@ public class ProcessState {
 
     @Field("memory_mb")
     private Double memoryMb;
-
-    /** Names of other services this node calls - used to draw flow edges. */
-    @Field("calls")
-    private List<String> calls;
 
     @Field("last_seen")
     private Instant lastSeen;
@@ -78,14 +74,6 @@ public class ProcessState {
 
     public void setMemoryMb(Double memoryMb) {
         this.memoryMb = memoryMb;
-    }
-
-    public List<String> getCalls() {
-        return calls;
-    }
-
-    public void setCalls(List<String> calls) {
-        this.calls = calls;
     }
 
     public Instant getLastSeen() {

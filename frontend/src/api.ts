@@ -15,8 +15,26 @@ export interface ProcessState {
   status: "UP" | "DEGRADED" | "DOWN" | "UNKNOWN";
   cpuPercent: number | null;
   memoryMb: number | null;
-  calls: string[] | null;
   lastSeen: string;
+}
+
+export type ConnectionDirection = "SOURCE_TO_TARGET" | "TARGET_TO_SOURCE" | "BIDIRECTIONAL";
+
+export interface Connection {
+  id: string;
+  sourceService: string;
+  targetService: string;
+  direction: ConnectionDirection;
+  communicationType: string | null;
+  description: string | null;
+}
+
+export interface ConnectionPayload {
+  sourceService: string;
+  targetService: string;
+  direction: ConnectionDirection;
+  communicationType?: string;
+  description?: string;
 }
 
 export async function searchLogs(
@@ -46,7 +64,7 @@ export interface HeartbeatPayload {
   serviceName: string;
   status: ProcessState["status"];
   processName?: string;
-  calls?: string[];
+  connections?: string[];
 }
 
 export async function postHeartbeat(payload: HeartbeatPayload): Promise<void> {
@@ -56,6 +74,62 @@ export async function postHeartbeat(payload: HeartbeatPayload): Promise<void> {
     body: JSON.stringify(payload),
   });
   if (!res.ok) throw new Error(`Failed to add service: ${res.status}`);
+}
+
+export interface NodeUpdatePayload {
+  serviceName: string;
+  status: ProcessState["status"];
+  processName?: string;
+  connections?: string[];
+}
+
+export async function updateNode(currentServiceName: string, payload: NodeUpdatePayload): Promise<void> {
+  const res = await fetch(`${API_BASE_URL}/api/process/nodes/${encodeURIComponent(currentServiceName)}`, {
+    method: "PUT",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(payload),
+  });
+  if (!res.ok) throw new Error(`Failed to update service: ${res.status}`);
+}
+
+export async function deleteNode(serviceName: string): Promise<void> {
+  const res = await fetch(`${API_BASE_URL}/api/process/nodes/${encodeURIComponent(serviceName)}`, {
+    method: "DELETE",
+  });
+  if (!res.ok) throw new Error(`Failed to delete service: ${res.status}`);
+}
+
+export async function fetchConnections(): Promise<Connection[]> {
+  const res = await fetch(`${API_BASE_URL}/api/process/connections`);
+  if (!res.ok) throw new Error(`Failed to load connections: ${res.status}`);
+  return res.json();
+}
+
+export async function createConnection(payload: ConnectionPayload): Promise<Connection> {
+  const res = await fetch(`${API_BASE_URL}/api/process/connections`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(payload),
+  });
+  if (!res.ok) throw new Error(`Failed to create connection: ${res.status}`);
+  return res.json();
+}
+
+export async function updateConnection(id: string, payload: ConnectionPayload): Promise<Connection> {
+  const res = await fetch(`${API_BASE_URL}/api/process/connections/${encodeURIComponent(id)}`, {
+    method: "PUT",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(payload),
+  });
+  if (!res.ok) throw new Error(`Failed to update connection: ${res.status}`);
+  return res.json();
+}
+
+export async function deleteConnection(id: string): Promise<void> {
+  const res = await fetch(`${API_BASE_URL}/api/process/connections/${encodeURIComponent(id)}`, {
+    method: "DELETE",
+  });
+  if (!res.ok) throw new Error(`Failed to delete connection: ${res.status}`);
 }
 
 export async function askAi(question: string): Promise<unknown> {

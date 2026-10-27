@@ -762,6 +762,18 @@ tr:last-child td {
   margin-top: 14px;
 }
 
+.calls-picker input[type="text"] {
+  width: 100%;
+  margin-top: 8px;
+  padding: 10px 14px;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  background: var(--bg);
+  color: var(--text);
+  font-size: 14px;
+  outline: none;
+}
+
 .calls-label {
   font-size: 13px;
   font-weight: 600;
@@ -783,4 +795,49 @@ tr:last-child td {
   font-size: 13px;
   cursor: pointer;
   background: var(--bg);
+}
+
+/* ---------- Edit modals (node / connection) ---------- */
+
+.btn-danger {
+  background: transparent;
+  color: var(--down);
+  border: 1px solid var(--down);
+}
+
+.btn-danger:hover:not(:disabled) {
+  background: var(--down);
+  color: var(--accent-contrast);
+}
+
+.connection-description {
+  width: 100%;
+  margin-top: 8px;
+  min-height: 72px;
+  padding: 10px 14px;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  background: var(--bg);
+  color: var(--text);
+  font-size: 14px;
+  font-family: inherit;
+  resize: vertical;
+}
+
+.modal-overlay {
+  position: fixed;
+  inset: 0;
+  background: rgba(0, 0, 0, 0.5);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 100;
+  padding: 20px;
+}
+
+.modal-card {
+  max-width: 420px;
+  width: 100%;
+  max-height: 90vh;
+  overflow-y: auto;
 }

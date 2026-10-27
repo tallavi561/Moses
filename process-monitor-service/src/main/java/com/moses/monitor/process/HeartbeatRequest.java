@@ -17,7 +17,9 @@ public class HeartbeatRequest {
 
     private Double cpuPercent;
     private Double memoryMb;
-    private List<String> calls;
+
+    /** Other node names to connect this one to (creates default connections). */
+    private List<String> connections;
 
     public String getServiceName() {
         return serviceName;
@@ -59,11 +61,11 @@ public class HeartbeatRequest {
         this.memoryMb = memoryMb;
     }
 
-    public List<String> getCalls() {
-        return calls;
+    public List<String> getConnections() {
+        return connections;
     }
 
-    public void setCalls(List<String> calls) {
-        this.calls = calls;
+    public void setConnections(List<String> connections) {
+        this.connections = connections;
     }
 }
