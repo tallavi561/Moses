@@ -6,18 +6,20 @@ import Modal from "./Modal";
 interface EditNodeFormProps {
   node: ProcessState;
   otherServiceNames: string[];
-  onSave: (serviceName: string, status: ProcessState["status"], connections: string[]) => Promise<void>;
+  initialConnections: string[];
+  onSave: (serviceName: string, status: ProcessState["status"], description: string, connections: string[]) => Promise<void>;
   onDelete: () => Promise<void>;
   onClose: () => void;
 }
 
 const STATUSES: ProcessState["status"][] = ["UP", "DEGRADED", "DOWN", "UNKNOWN"];
 
-export default function EditNodeForm({ node, otherServiceNames, onSave, onDelete, onClose }: EditNodeFormProps) {
+export default function EditNodeForm({ node, otherServiceNames, initialConnections, onSave, onDelete, onClose }: EditNodeFormProps) {
   const { t } = useLanguage();
   const [name, setName] = useState(node.serviceName);
   const [status, setStatus] = useState(node.status);
-  const [connections, setConnections] = useState<string[]>([]);
+  const [description, setDescription] = useState(node.description ?? "");
+  const [connections, setConnections] = useState<string[]>(initialConnections);
   const [error, setError] = useState<string | null>(null);
   const [submitting, setSubmitting] = useState(false);
 
@@ -34,7 +36,7 @@ export default function EditNodeForm({ node, otherServiceNames, onSave, onDelete
     setSubmitting(true);
     setError(null);
     try {
-      await onSave(trimmed, status, connections);
+      await onSave(trimmed, status, description.trim(), connections);
       onClose();
     } catch {
       setError(t.flow.updateFailed);
@@ -69,6 +71,16 @@ export default function EditNodeForm({ node, otherServiceNames, onSave, onDelete
             </option>
           ))}
         </select>
+      </div>
+
+      <div className="calls-picker">
+        <div className="calls-label">{t.flow.nodeDescription}</div>
+        <textarea
+          className="connection-description"
+          value={description}
+          onChange={(e) => setDescription(e.target.value)}
+          placeholder={t.flow.nodeDescriptionPlaceholder}
+        />
       </div>
 
       {otherServiceNames.length > 0 && (

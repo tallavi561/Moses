@@ -27,6 +27,7 @@ import { useProjects } from "../projects/ProjectsContext";
 import AddServiceForm from "../components/AddServiceForm";
 import EditNodeForm from "../components/EditNodeForm";
 import EditConnectionForm from "../components/EditConnectionForm";
+import ArchitectureListView from "../components/ArchitectureListView";
 
 const STATUS_COLOR: Record<ProcessState["status"], string> = {
   UP: "var(--up)",
@@ -34,6 +35,8 @@ const STATUS_COLOR: Record<ProcessState["status"], string> = {
   DOWN: "var(--down)",
   UNKNOWN: "var(--unknown)",
 };
+
+type ViewMode = "graph" | "list";
 
 function defaultPosition(index: number): XYPosition {
   return { x: (index % 5) * 200, y: Math.floor(index / 5) * 140 };
@@ -57,11 +60,26 @@ function savePositions(key: string, positions: Record<string, XYPosition>) {
   }
 }
 
+function relatedServiceNames(connections: Connection[], serviceName: string): string[] {
+  return connections
+    .filter((c) => c.sourceService === serviceName || c.targetService === serviceName)
+    .map((c) => (c.sourceService === serviceName ? c.targetService : c.sourceService));
+}
+
 export default function FlowPage() {
   const { t } = useLanguage();
   const { currentProjectId } = useProjects();
   const positionsKey = `moses.flow.positions.${currentProjectId ?? "default"}`;
+  const viewKey = `moses.flow.view.${currentProjectId ?? "default"}`;
 
+  const [view, setView] = useState<ViewMode>(() => {
+    try {
+      const stored = localStorage.getItem(viewKey);
+      return stored === "list" ? "list" : "graph";
+    } catch {
+      return "graph";
+    }
+  });
   const [states, setStates] = useState<ProcessState[]>([]);
   const [connections, setConnections] = useState<Connection[]>([]);
   const [error, setError] = useState<string | null>(null);
@@ -69,6 +87,15 @@ export default function FlowPage() {
   const [editingNode, setEditingNode] = useState<ProcessState | null>(null);
   const [editingConnection, setEditingConnection] = useState<Connection | null>(null);
   const [nodes, setNodes, onNodesChange] = useNodesState<{ label: React.ReactNode }>([]);
+
+  function changeView(next: ViewMode) {
+    setView(next);
+    try {
+      localStorage.setItem(viewKey, next);
+    } catch {
+      // ignore
+    }
+  }
 
   const refresh = useCallback(async () => {
     try {
@@ -126,17 +153,33 @@ export default function FlowPage() {
     [positionsKey]
   );
 
-  async function handleAddService(serviceName: string, status: ProcessState["status"], connectionTargets: string[]) {
-    await postHeartbeat({ serviceName, status, connections: connectionTargets.length > 0 ? connectionTargets : undefined });
+  async function handleAddService(
+    serviceName: string,
+    status: ProcessState["status"],
+    description: string,
+    connectionTargets: string[]
+  ) {
+    await postHeartbeat({
+      serviceName,
+      status,
+      description: description || undefined,
+      connections: connectionTargets,
+    });
     await refresh();
   }
 
-  async function handleSaveNode(serviceName: string, status: ProcessState["status"], connectionTargets: string[]) {
+  async function handleSaveNode(
+    serviceName: string,
+    status: ProcessState["status"],
+    description: string,
+    connectionTargets: string[]
+  ) {
     if (!editingNode) return;
     await updateNode(editingNode.serviceName, {
       serviceName,
       status,
-      connections: connectionTargets.length > 0 ? connectionTargets : undefined,
+      description: description || undefined,
+      connections: connectionTargets,
     });
     if (serviceName !== editingNode.serviceName) {
       const positions = loadPositions(positionsKey);
@@ -203,18 +246,38 @@ export default function FlowPage() {
     <>
       <AddServiceForm existingServices={states.map((s) => s.serviceName)} onAdd={handleAddService} />
 
+      <div className="mode-switch" role="radiogroup">
+        <button
+          type="button"
+          className={`mode-option ${view === "graph" ? "active" : ""}`}
+          onClick={() => changeView("graph")}
+          aria-pressed={view === "graph"}
+        >
+          {t.flow.viewGraph}
+        </button>
+        <button
+          type="button"
+          className={`mode-option ${view === "list" ? "active" : ""}`}
+          onClick={() => changeView("list")}
+          aria-pressed={view === "list"}
+        >
+          {t.flow.viewList}
+        </button>
+      </div>
+
       <div className="card flow-card">
-        <p className="hint">{t.flow.editNodeHint}</p>
-        <div className="flow-canvas">
-          {error ? (
-            <div className="empty-state">
-              {t.flow.errorPrefix}: {error}
-            </div>
-          ) : loading ? (
-            <div className="loading-row">{t.flow.loading}</div>
-          ) : states.length === 0 ? (
-            <div className="empty-state">{t.flow.empty}</div>
-          ) : (
+        {view === "graph" && <p className="hint">{t.flow.editNodeHint}</p>}
+
+        {error ? (
+          <div className="empty-state">
+            {t.flow.errorPrefix}: {error}
+          </div>
+        ) : loading ? (
+          <div className="loading-row">{t.flow.loading}</div>
+        ) : states.length === 0 ? (
+          <div className="empty-state">{t.flow.empty}</div>
+        ) : view === "graph" ? (
+          <div className="flow-canvas">
             <ReactFlow
               nodes={nodes}
               edges={edges}
@@ -227,23 +290,28 @@ export default function FlowPage() {
               <Background />
               <Controls showInteractive={false} />
             </ReactFlow>
-          )}
-        </div>
+          </div>
+        ) : (
+          <ArchitectureListView states={states} connections={connections} onEditNode={setEditingNode} />
+        )}
 
-        <div className="flow-legend">
-          {(Object.keys(t.flow.status) as ProcessState["status"][]).map((status) => (
-            <span key={status} className="legend-item">
-              <span className="legend-dot" style={{ background: STATUS_COLOR[status] }} />
-              {t.flow.status[status]}
-            </span>
-          ))}
-        </div>
+        {view === "graph" && !error && !loading && states.length > 0 && (
+          <div className="flow-legend">
+            {(Object.keys(t.flow.status) as ProcessState["status"][]).map((status) => (
+              <span key={status} className="legend-item">
+                <span className="legend-dot" style={{ background: STATUS_COLOR[status] }} />
+                {t.flow.status[status]}
+              </span>
+            ))}
+          </div>
+        )}
       </div>
 
       {editingNode && (
         <EditNodeForm
           node={editingNode}
           otherServiceNames={states.map((s) => s.serviceName).filter((n) => n !== editingNode.serviceName)}
+          initialConnections={relatedServiceNames(connections, editingNode.serviceName)}
           onSave={handleSaveNode}
           onDelete={handleDeleteNode}
           onClose={() => setEditingNode(null)}

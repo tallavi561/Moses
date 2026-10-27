@@ -21,6 +21,9 @@ public class ProcessState {
     @Field("process_name")
     private String processName;
 
+    @Field("description")
+    private String description;
+
     @Field("status")
     private ProcessStatus status;
 
@@ -50,6 +53,14 @@ public class ProcessState {
 
     public void setProcessName(String processName) {
         this.processName = processName;
+    }
+
+    public String getDescription() {
+        return description;
+    }
+
+    public void setDescription(String description) {
+        this.description = description;
     }
 
     public ProcessStatus getStatus() {

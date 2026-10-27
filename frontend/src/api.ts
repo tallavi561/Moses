@@ -12,6 +12,7 @@ export interface LogEntry {
 export interface ProcessState {
   serviceName: string;
   processName: string | null;
+  description: string | null;
   status: "UP" | "DEGRADED" | "DOWN" | "UNKNOWN";
   cpuPercent: number | null;
   memoryMb: number | null;
@@ -64,6 +65,7 @@ export interface HeartbeatPayload {
   serviceName: string;
   status: ProcessState["status"];
   processName?: string;
+  description?: string;
   connections?: string[];
 }
 
@@ -80,6 +82,7 @@ export interface NodeUpdatePayload {
   serviceName: string;
   status: ProcessState["status"];
   processName?: string;
+  description?: string;
   connections?: string[];
 }
 

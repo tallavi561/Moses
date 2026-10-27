@@ -11,6 +11,7 @@ public class HeartbeatRequest {
     private String serviceName;
 
     private String processName;
+    private String description;
 
     @NotNull
     private ProcessStatus status;
@@ -35,6 +36,14 @@ public class HeartbeatRequest {
 
     public void setProcessName(String processName) {
         this.processName = processName;
+    }
+
+    public String getDescription() {
+        return description;
+    }
+
+    public void setDescription(String description) {
+        this.description = description;
     }
 
     public ProcessStatus getStatus() {

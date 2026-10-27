@@ -36,13 +36,14 @@ public class ProcessStateController {
         ProcessState state = new ProcessState();
         state.setServiceName(request.getServiceName());
         state.setProcessName(request.getProcessName());
+        state.setDescription(request.getDescription());
         state.setStatus(request.getStatus());
         state.setCpuPercent(request.getCpuPercent());
         state.setMemoryMb(request.getMemoryMb());
         state.setLastSeen(Instant.now());
 
         mongoTemplate.save(state);
-        ensureDefaultConnections(request.getServiceName(), request.getConnections());
+        syncConnections(request.getServiceName(), request.getConnections());
         return ResponseEntity.accepted().build();
     }
 
@@ -64,6 +65,7 @@ public class ProcessStateController {
         ProcessState updated = new ProcessState();
         updated.setServiceName(request.getServiceName());
         updated.setProcessName(request.getProcessName());
+        updated.setDescription(request.getDescription());
         updated.setStatus(request.getStatus());
         updated.setCpuPercent(request.getCpuPercent());
         updated.setMemoryMb(request.getMemoryMb());
@@ -75,7 +77,7 @@ public class ProcessStateController {
             renameServiceInConnections(serviceName, request.getServiceName());
         }
 
-        ensureDefaultConnections(request.getServiceName(), request.getConnections());
+        syncConnections(request.getServiceName(), request.getConnections());
         return ResponseEntity.ok(updated);
     }
 
@@ -106,20 +108,39 @@ public class ProcessStateController {
         });
     }
 
-    /** For each target in {@code connectionTargets}, create a default connection if one doesn't already exist. */
-    private void ensureDefaultConnections(String serviceName, List<String> connectionTargets) {
-        if (connectionTargets == null) {
+    /**
+     * Makes {@code serviceName}'s connections match {@code desiredOtherNames} exactly: creates a
+     * default connection for any new name, and removes any existing connection (in either
+     * direction) to a name no longer in the list. {@code null} means "leave connections as they
+     * are" (e.g. a heartbeat that doesn't mention connections at all).
+     */
+    private void syncConnections(String serviceName, List<String> desiredOtherNames) {
+        if (desiredOtherNames == null) {
             return;
         }
-        for (String target : connectionTargets) {
-            if (target == null || target.isBlank() || target.equals(serviceName)) {
-                continue;
+        List<String> desired = desiredOtherNames.stream()
+                .filter(name -> name != null && !name.isBlank() && !name.equals(serviceName))
+                .toList();
+
+        List<Connection> existing = mongoTemplate.find(
+                new Query(new Criteria().orOperator(
+                        Criteria.where("source_service").is(serviceName),
+                        Criteria.where("target_service").is(serviceName))),
+                Connection.class);
+
+        for (Connection connection : existing) {
+            String other = connection.getSourceService().equals(serviceName)
+                    ? connection.getTargetService()
+                    : connection.getSourceService();
+            if (!desired.contains(other)) {
+                mongoTemplate.remove(connection);
             }
-            boolean exists = mongoTemplate.exists(
-                    new Query(new Criteria().orOperator(
-                            Criteria.where("source_service").is(serviceName).and("target_service").is(target),
-                            Criteria.where("source_service").is(target).and("target_service").is(serviceName))),
-                    Connection.class);
+        }
+
+        for (String target : desired) {
+            boolean exists = existing.stream().anyMatch(c ->
+                    (c.getSourceService().equals(serviceName) && c.getTargetService().equals(target))
+                            || (c.getSourceService().equals(target) && c.getTargetService().equals(serviceName)));
             if (!exists) {
                 Connection connection = new Connection();
                 connection.setSourceService(serviceName);

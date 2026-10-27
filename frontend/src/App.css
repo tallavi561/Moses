@@ -841,3 +841,101 @@ tr:last-child td {
   max-height: 90vh;
   overflow-y: auto;
 }
+
+/* ---------- Architecture list view ---------- */
+
+.arch-list {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.arch-row {
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  overflow: hidden;
+}
+
+.arch-row-header {
+  width: 100%;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 12px 14px;
+  background: var(--surface-muted);
+  border: none;
+  color: var(--text);
+  font-size: 14px;
+  cursor: pointer;
+  text-align: start;
+}
+
+.arch-row-chevron {
+  flex-shrink: 0;
+  width: 14px;
+  height: 14px;
+  transition: transform 0.15s;
+}
+
+.arch-row-chevron.open {
+  transform: rotate(90deg);
+}
+
+.arch-row-name {
+  font-weight: 600;
+  flex: 1;
+}
+
+.arch-row-status {
+  font-size: 12px;
+  color: var(--text-muted);
+}
+
+.arch-row-body {
+  padding: 14px;
+  border-top: 1px solid var(--border);
+}
+
+.arch-row-description {
+  font-size: 13px;
+  color: var(--text-muted);
+  margin: 0 0 14px;
+}
+
+.arch-connections {
+  list-style: none;
+  margin: 8px 0 14px;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.arch-connection-item {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+  padding: 8px 12px;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  background: var(--bg);
+  font-size: 13px;
+}
+
+.arch-connection-direction {
+  font-weight: 600;
+}
+
+.arch-connection-type {
+  padding: 2px 8px;
+  border-radius: 999px;
+  background: var(--surface-muted);
+  font-size: 12px;
+  color: var(--text-muted);
+}
+
+.arch-connection-description {
+  color: var(--text-muted);
+  flex-basis: 100%;
+}

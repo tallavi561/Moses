@@ -4,7 +4,7 @@ import { useLanguage } from "../i18n/LanguageContext";
 
 interface AddServiceFormProps {
   existingServices: string[];
-  onAdd: (serviceName: string, status: ProcessState["status"], calls: string[]) => Promise<void>;
+  onAdd: (serviceName: string, status: ProcessState["status"], description: string, calls: string[]) => Promise<void>;
 }
 
 const STATUSES: ProcessState["status"][] = ["UP", "DEGRADED", "DOWN", "UNKNOWN"];
@@ -14,6 +14,7 @@ export default function AddServiceForm({ existingServices, onAdd }: AddServiceFo
   const [open, setOpen] = useState(false);
   const [name, setName] = useState("");
   const [status, setStatus] = useState<ProcessState["status"]>("UP");
+  const [description, setDescription] = useState("");
   const [calls, setCalls] = useState<string[]>([]);
   const [error, setError] = useState<string | null>(null);
   const [submitting, setSubmitting] = useState(false);
@@ -25,6 +26,7 @@ export default function AddServiceForm({ existingServices, onAdd }: AddServiceFo
   function reset() {
     setName("");
     setStatus("UP");
+    setDescription("");
     setCalls([]);
     setError(null);
     setOpen(false);
@@ -39,7 +41,7 @@ export default function AddServiceForm({ existingServices, onAdd }: AddServiceFo
     setSubmitting(true);
     setError(null);
     try {
-      await onAdd(trimmed, status, calls);
+      await onAdd(trimmed, status, description.trim(), calls);
       reset();
     } catch {
       setError(t.flow.addFailed);
@@ -79,6 +81,16 @@ export default function AddServiceForm({ existingServices, onAdd }: AddServiceFo
             </option>
           ))}
         </select>
+      </div>
+
+      <div className="calls-picker">
+        <div className="calls-label">{t.flow.nodeDescription}</div>
+        <textarea
+          className="connection-description"
+          value={description}
+          onChange={(e) => setDescription(e.target.value)}
+          placeholder={t.flow.nodeDescriptionPlaceholder}
+        />
       </div>
 
       {existingServices.length > 0 && (
