@@ -33,6 +33,8 @@ public class ProcessStateController {
 
     @PostMapping("/heartbeat")
     public ResponseEntity<Void> heartbeat(@Valid @RequestBody HeartbeatRequest request) {
+        ProcessState existing = mongoTemplate.findById(request.getServiceName(), ProcessState.class);
+
         ProcessState state = new ProcessState();
         state.setServiceName(request.getServiceName());
         state.setProcessName(request.getProcessName());
@@ -40,7 +42,9 @@ public class ProcessStateController {
         state.setStatus(request.getStatus());
         state.setCpuPercent(request.getCpuPercent());
         state.setMemoryMb(request.getMemoryMb());
+        state.setProbeUrl(request.getProbeUrl());
         state.setLastSeen(Instant.now());
+        carryOverProbeTelemetry(existing, state);
 
         mongoTemplate.save(state);
         syncConnections(request.getServiceName(), request.getConnections());
@@ -69,7 +73,9 @@ public class ProcessStateController {
         updated.setStatus(request.getStatus());
         updated.setCpuPercent(request.getCpuPercent());
         updated.setMemoryMb(request.getMemoryMb());
+        updated.setProbeUrl(request.getProbeUrl());
         updated.setLastSeen(existing.getLastSeen());
+        carryOverProbeTelemetry(existing, updated);
         mongoTemplate.save(updated);
 
         if (renamed) {
@@ -90,6 +96,25 @@ public class ProcessStateController {
                         Criteria.where("target_service").is(serviceName))),
                 Connection.class);
         return ResponseEntity.noContent().build();
+    }
+
+    /**
+     * Probe telemetry (last probe time/status/latency/error) is written only by
+     * {@link EndpointProber}, never by a heartbeat/edit request, so each request that rebuilds
+     * the document from scratch needs to carry it forward - except when the probe URL itself
+     * changed, in which case stale telemetry from the old target would be misleading.
+     */
+    private void carryOverProbeTelemetry(ProcessState existing, ProcessState updated) {
+        if (existing == null) {
+            return;
+        }
+        boolean sameProbeUrl = java.util.Objects.equals(existing.getProbeUrl(), updated.getProbeUrl());
+        if (sameProbeUrl) {
+            updated.setLastProbeAt(existing.getLastProbeAt());
+            updated.setLastProbeStatusCode(existing.getLastProbeStatusCode());
+            updated.setLastProbeLatencyMs(existing.getLastProbeLatencyMs());
+            updated.setLastProbeError(existing.getLastProbeError());
+        }
     }
 
     private void renameServiceInConnections(String oldName, String newName) {

@@ -157,12 +157,14 @@ export default function FlowPage() {
     serviceName: string,
     status: ProcessState["status"],
     description: string,
+    probeUrl: string,
     connectionTargets: string[]
   ) {
     await postHeartbeat({
       serviceName,
       status,
       description: description || undefined,
+      probeUrl: probeUrl || undefined,
       connections: connectionTargets,
     });
     await refresh();
@@ -172,6 +174,7 @@ export default function FlowPage() {
     serviceName: string,
     status: ProcessState["status"],
     description: string,
+    probeUrl: string,
     connectionTargets: string[]
   ) {
     if (!editingNode) return;
@@ -179,6 +182,7 @@ export default function FlowPage() {
       serviceName,
       status,
       description: description || undefined,
+      probeUrl: probeUrl || undefined,
       connections: connectionTargets,
     });
     if (serviceName !== editingNode.serviceName) {

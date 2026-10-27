@@ -5,7 +5,13 @@ import ConnectionsPicker from "./ConnectionsPicker";
 
 interface AddServiceFormProps {
   existingServices: string[];
-  onAdd: (serviceName: string, status: ProcessState["status"], description: string, calls: string[]) => Promise<void>;
+  onAdd: (
+    serviceName: string,
+    status: ProcessState["status"],
+    description: string,
+    probeUrl: string,
+    calls: string[]
+  ) => Promise<void>;
 }
 
 const STATUSES: ProcessState["status"][] = ["UP", "DEGRADED", "DOWN", "UNKNOWN"];
@@ -16,6 +22,7 @@ export default function AddServiceForm({ existingServices, onAdd }: AddServiceFo
   const [name, setName] = useState("");
   const [status, setStatus] = useState<ProcessState["status"]>("UP");
   const [description, setDescription] = useState("");
+  const [probeUrl, setProbeUrl] = useState("");
   const [calls, setCalls] = useState<string[]>([]);
   const [error, setError] = useState<string | null>(null);
   const [submitting, setSubmitting] = useState(false);
@@ -24,6 +31,7 @@ export default function AddServiceForm({ existingServices, onAdd }: AddServiceFo
     setName("");
     setStatus("UP");
     setDescription("");
+    setProbeUrl("");
     setCalls([]);
     setError(null);
     setOpen(false);
@@ -38,7 +46,7 @@ export default function AddServiceForm({ existingServices, onAdd }: AddServiceFo
     setSubmitting(true);
     setError(null);
     try {
-      await onAdd(trimmed, status, description.trim(), calls);
+      await onAdd(trimmed, status, description.trim(), probeUrl.trim(), calls);
       reset();
     } catch {
       setError(t.flow.addFailed);
@@ -87,6 +95,17 @@ export default function AddServiceForm({ existingServices, onAdd }: AddServiceFo
           value={description}
           onChange={(e) => setDescription(e.target.value)}
           placeholder={t.flow.nodeDescriptionPlaceholder}
+        />
+      </div>
+
+      <div className="calls-picker">
+        <div className="calls-label">{t.flow.probeUrl}</div>
+        <p className="hint">{t.flow.probeUrlHint}</p>
+        <input
+          type="text"
+          value={probeUrl}
+          onChange={(e) => setProbeUrl(e.target.value)}
+          placeholder={t.flow.probeUrlPlaceholder}
         />
       </div>
 

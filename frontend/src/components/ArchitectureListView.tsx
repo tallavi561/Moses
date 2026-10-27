@@ -2,6 +2,7 @@ import { useState } from "react";
 import type { Connection, ProcessState } from "../api";
 import { useLanguage } from "../i18n/LanguageContext";
 import { IconChevron } from "../icons";
+import { probeStatusLabel } from "../probeStatus";
 
 interface ArchitectureListViewProps {
   states: ProcessState[];
@@ -58,6 +59,7 @@ export default function ArchitectureListView({ states, connections, onEditNode, 
                   {isExpanded && (
                     <div className="arch-row-body">
                       <p className="arch-row-description">{node.description || t.flow.listNoDescription}</p>
+                      {probeStatusLabel(node, t) && <p className="hint">{probeStatusLabel(node, t)}</p>}
                       <button className="btn-secondary" onClick={() => onEditNode(node)}>
                         {t.flow.listEditNode}
                       </button>

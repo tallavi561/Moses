@@ -10,3 +10,8 @@ spring:
   data:
     mongodb:
       uri: ${MONGODB_URI:mongodb://localhost:27017/moses_monitor}
+
+moses:
+  prober:
+    interval-ms: ${PROBE_INTERVAL_MS:15000}
+    timeout-ms: ${PROBE_TIMEOUT_MS:5000}

@@ -18,6 +18,7 @@ public class HeartbeatRequest {
 
     private Double cpuPercent;
     private Double memoryMb;
+    private String probeUrl;
 
     /** Other node names to connect this one to (creates default connections). */
     private List<String> connections;
@@ -68,6 +69,14 @@ public class HeartbeatRequest {
 
     public void setMemoryMb(Double memoryMb) {
         this.memoryMb = memoryMb;
+    }
+
+    public String getProbeUrl() {
+        return probeUrl;
+    }
+
+    public void setProbeUrl(String probeUrl) {
+        this.probeUrl = probeUrl;
     }
 
     public List<String> getConnections() {

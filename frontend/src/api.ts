@@ -17,6 +17,11 @@ export interface ProcessState {
   cpuPercent: number | null;
   memoryMb: number | null;
   lastSeen: string;
+  probeUrl: string | null;
+  lastProbeAt: string | null;
+  lastProbeStatusCode: number | null;
+  lastProbeLatencyMs: number | null;
+  lastProbeError: string | null;
 }
 
 export type ConnectionDirection = "SOURCE_TO_TARGET" | "TARGET_TO_SOURCE" | "BIDIRECTIONAL";
@@ -66,6 +71,7 @@ export interface HeartbeatPayload {
   status: ProcessState["status"];
   processName?: string;
   description?: string;
+  probeUrl?: string;
   connections?: string[];
 }
 
@@ -83,6 +89,7 @@ export interface NodeUpdatePayload {
   status: ProcessState["status"];
   processName?: string;
   description?: string;
+  probeUrl?: string;
   connections?: string[];
 }
 

@@ -3,12 +3,19 @@ import type { ProcessState } from "../api";
 import { useLanguage } from "../i18n/LanguageContext";
 import Modal from "./Modal";
 import ConnectionsPicker from "./ConnectionsPicker";
+import { probeStatusLabel } from "../probeStatus";
 
 interface EditNodeFormProps {
   node: ProcessState;
   otherServiceNames: string[];
   initialConnections: string[];
-  onSave: (serviceName: string, status: ProcessState["status"], description: string, connections: string[]) => Promise<void>;
+  onSave: (
+    serviceName: string,
+    status: ProcessState["status"],
+    description: string,
+    probeUrl: string,
+    connections: string[]
+  ) => Promise<void>;
   onDelete: () => Promise<void>;
   onClose: () => void;
 }
@@ -20,6 +27,7 @@ export default function EditNodeForm({ node, otherServiceNames, initialConnectio
   const [name, setName] = useState(node.serviceName);
   const [status, setStatus] = useState(node.status);
   const [description, setDescription] = useState(node.description ?? "");
+  const [probeUrl, setProbeUrl] = useState(node.probeUrl ?? "");
   const [connections, setConnections] = useState<string[]>(initialConnections);
   const [error, setError] = useState<string | null>(null);
   const [submitting, setSubmitting] = useState(false);
@@ -33,7 +41,7 @@ export default function EditNodeForm({ node, otherServiceNames, initialConnectio
     setSubmitting(true);
     setError(null);
     try {
-      await onSave(trimmed, status, description.trim(), connections);
+      await onSave(trimmed, status, description.trim(), probeUrl.trim(), connections);
       onClose();
     } catch {
       setError(t.flow.updateFailed);
@@ -78,6 +86,18 @@ export default function EditNodeForm({ node, otherServiceNames, initialConnectio
           onChange={(e) => setDescription(e.target.value)}
           placeholder={t.flow.nodeDescriptionPlaceholder}
         />
+      </div>
+
+      <div className="calls-picker">
+        <div className="calls-label">{t.flow.probeUrl}</div>
+        <p className="hint">{t.flow.probeUrlHint}</p>
+        <input
+          type="text"
+          value={probeUrl}
+          onChange={(e) => setProbeUrl(e.target.value)}
+          placeholder={t.flow.probeUrlPlaceholder}
+        />
+        {probeStatusLabel(node, t) && <p className="hint">{probeStatusLabel(node, t)}</p>}
       </div>
 
       {otherServiceNames.length > 0 && (

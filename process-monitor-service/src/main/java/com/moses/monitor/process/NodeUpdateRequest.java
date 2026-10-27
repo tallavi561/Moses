@@ -23,6 +23,7 @@ public class NodeUpdateRequest {
 
     private Double cpuPercent;
     private Double memoryMb;
+    private String probeUrl;
 
     /** Other node names this one should be connected to (new ones get a default connection). */
     private List<String> connections;
@@ -73,6 +74,14 @@ public class NodeUpdateRequest {
 
     public void setMemoryMb(Double memoryMb) {
         this.memoryMb = memoryMb;
+    }
+
+    public String getProbeUrl() {
+        return probeUrl;
+    }
+
+    public void setProbeUrl(String probeUrl) {
+        this.probeUrl = probeUrl;
     }
 
     public List<String> getConnections() {

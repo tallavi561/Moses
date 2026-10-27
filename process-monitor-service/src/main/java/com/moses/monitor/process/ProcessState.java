@@ -36,6 +36,22 @@ public class ProcessState {
     @Field("last_seen")
     private Instant lastSeen;
 
+    /** If set, {@link EndpointProber} polls this URL on a schedule and drives status from the result. */
+    @Field("probe_url")
+    private String probeUrl;
+
+    @Field("last_probe_at")
+    private Instant lastProbeAt;
+
+    @Field("last_probe_status_code")
+    private Integer lastProbeStatusCode;
+
+    @Field("last_probe_latency_ms")
+    private Long lastProbeLatencyMs;
+
+    @Field("last_probe_error")
+    private String lastProbeError;
+
     public ProcessState() {
     }
 
@@ -93,5 +109,45 @@ public class ProcessState {
 
     public void setLastSeen(Instant lastSeen) {
         this.lastSeen = lastSeen;
+    }
+
+    public String getProbeUrl() {
+        return probeUrl;
+    }
+
+    public void setProbeUrl(String probeUrl) {
+        this.probeUrl = probeUrl;
+    }
+
+    public Instant getLastProbeAt() {
+        return lastProbeAt;
+    }
+
+    public void setLastProbeAt(Instant lastProbeAt) {
+        this.lastProbeAt = lastProbeAt;
+    }
+
+    public Integer getLastProbeStatusCode() {
+        return lastProbeStatusCode;
+    }
+
+    public void setLastProbeStatusCode(Integer lastProbeStatusCode) {
+        this.lastProbeStatusCode = lastProbeStatusCode;
+    }
+
+    public Long getLastProbeLatencyMs() {
+        return lastProbeLatencyMs;
+    }
+
+    public void setLastProbeLatencyMs(Long lastProbeLatencyMs) {
+        this.lastProbeLatencyMs = lastProbeLatencyMs;
+    }
+
+    public String getLastProbeError() {
+        return lastProbeError;
+    }
+
+    public void setLastProbeError(String lastProbeError) {
+        this.lastProbeError = lastProbeError;
     }
 }
