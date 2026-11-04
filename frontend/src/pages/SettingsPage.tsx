@@ -6,26 +6,36 @@ export default function SettingsPage() {
   const { mode, setMode } = useTheme();
 
   return (
-    <div className="card">
-      <h2>{t.settings.title}</h2>
-      <p className="hint">{t.settings.appearance}</p>
+    <>
+      <div className="card">
+        <h2>{t.settings.title}</h2>
+        <p className="hint">{t.settings.appearance}</p>
 
-      <div className="mode-switch" role="radiogroup">
-        <button
-          className={`mode-option ${mode === "dark" ? "active" : ""}`}
-          onClick={() => setMode("dark")}
-          aria-pressed={mode === "dark"}
-        >
-          {t.settings.darkMode}
-        </button>
-        <button
-          className={`mode-option ${mode === "light" ? "active" : ""}`}
-          onClick={() => setMode("light")}
-          aria-pressed={mode === "light"}
-        >
-          {t.settings.lightMode}
-        </button>
+        <div className="mode-switch" role="radiogroup">
+          <button
+            className={`mode-option ${mode === "dark" ? "active" : ""}`}
+            onClick={() => setMode("dark")}
+            aria-pressed={mode === "dark"}
+          >
+            {t.settings.darkMode}
+          </button>
+          <button
+            className={`mode-option ${mode === "light" ? "active" : ""}`}
+            onClick={() => setMode("light")}
+            aria-pressed={mode === "light"}
+          >
+            {t.settings.lightMode}
+          </button>
+        </div>
       </div>
-    </div>
+
+      <div className="card">
+        <h2>{t.settings.integrationTitle}</h2>
+        <p className="hint">{t.settings.integrationHint}</p>
+        <a className="btn" href="/moses-monitoring-skill.md" download>
+          {t.settings.downloadSkill}
+        </a>
+      </div>
+    </>
   );
 }

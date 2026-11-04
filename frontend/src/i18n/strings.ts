@@ -104,6 +104,9 @@ export const strings = {
       appearance: "Appearance",
       darkMode: "Dark mode",
       lightMode: "Light mode",
+      integrationTitle: "Connect your services",
+      integrationHint: "Download this skill and hand it to your coding AI (Claude, etc.) - it will wire your services to send real logs and status here, instead of you entering them by hand.",
+      downloadSkill: "Download integration skill",
     },
     auth: {
       welcome: "Welcome to MoSes Monitor",
@@ -227,6 +230,9 @@ export const strings = {
       appearance: "מראה",
       darkMode: "מצב כהה",
       lightMode: "מצב בהיר",
+      integrationTitle: "חיבור השירותים שלך",
+      integrationHint: "הורד את ה-SKILL הזה ותן אותו ל-AI שכותב עבורך קוד (Claude וכו') - הוא יחבר את השירותים שלך לשליחת logs וסטטוס אמיתיים לכאן, במקום שתזין אותם ידנית.",
+      downloadSkill: "הורד SKILL לחיבור",
     },
     auth: {
       welcome: "ברוכים הבאים ל-MoSes Monitor",
