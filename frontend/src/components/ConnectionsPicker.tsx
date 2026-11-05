@@ -1,4 +1,5 @@
 import { useLanguage } from "../i18n/LanguageContext";
+import { Icon } from "../icons";
 
 interface ConnectionsPickerProps {
   selected: string[];
@@ -26,22 +27,25 @@ export default function ConnectionsPicker({ selected, available, onChange }: Con
   }
 
   return (
-    <div className="calls-picker">
-      <div className="calls-label">{t.flow.callsLabel}</div>
-      <p className="hint">{t.flow.callsHint}</p>
+    <div className="flex flex-col gap-space-xs">
+      <div className="font-label-md text-label-md text-on-surface-variant uppercase">{t.flow.callsLabel}</div>
+      <p className="font-body-sm text-body-sm text-on-surface-variant">{t.flow.callsHint}</p>
 
       {selected.length > 0 && (
-        <div className="connection-chips">
+        <div className="flex flex-wrap gap-1.5">
           {selected.map((service) => (
-            <span key={service} className="connection-chip">
+            <span
+              key={service}
+              className="inline-flex items-center gap-1 pl-space-sm pr-1 py-1 rounded-full bg-secondary-container/20 text-secondary font-code text-code-sm"
+            >
               {service}
               <button
                 type="button"
-                className="connection-chip-remove"
+                className="w-4 h-4 rounded-full flex items-center justify-center hover:bg-secondary/20"
                 onClick={() => remove(service)}
                 aria-label={t.flow.removeConnection.replace("{service}", service)}
               >
-                &times;
+                <Icon name="close" size={12} />
               </button>
             </span>
           ))}
@@ -50,7 +54,7 @@ export default function ConnectionsPicker({ selected, available, onChange }: Con
 
       {remaining.length > 0 ? (
         <select
-          className="status-select connection-add-select"
+          className="bg-surface-container-highest text-on-surface font-body-md text-body-md px-space-sm py-1.5 rounded-lg focus:outline-none focus:ring-1 focus:ring-secondary cursor-pointer"
           value=""
           onChange={(e) => add(e.target.value)}
         >
@@ -64,7 +68,7 @@ export default function ConnectionsPicker({ selected, available, onChange }: Con
           ))}
         </select>
       ) : available.length > 0 ? (
-        <p className="hint">{t.flow.noMoreServicesToConnect}</p>
+        <p className="font-body-sm text-body-sm text-on-surface-variant">{t.flow.noMoreServicesToConnect}</p>
       ) : null}
     </div>
   );

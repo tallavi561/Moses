@@ -1,86 +1,101 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
 /*
-  Color system per the UX spec (frontend/מסמך אפיון.docx):
-  - Dark mode is the default ("black background"), with an explicit toggle to
-    light mode under Settings - NOT driven by prefers-color-scheme.
-  - Accent is burgundy #9B0515 (spec-specified). Amber and teal were added as
-    a secondary/tertiary accent pair to balance it (see chat for rationale).
+  Design tokens: Material-3-style color roles, crimson/cyan brand
+  (MoSes "observability" palette). Dark is the product default; light is an
+  explicit opt-in from Settings (see theme/ThemeContext.tsx) - never driven
+  by prefers-color-scheme.
 */
 
 :root,
 :root[data-theme="dark"] {
-  --bg: #0b0c0f;
-  --surface: #16181d;
-  --surface-muted: #1d2027;
-  --border: #2a2d35;
-  --text: #e8e6e3;
-  --text-muted: #9aa0ac;
+  --background: #121317;
+  --surface: #121317;
+  --surface-dim: #121317;
+  --surface-bright: #38393e;
+  --surface-container-lowest: #0d0e12;
+  --surface-container-low: #1a1b20;
+  --surface-container: #1f1f24;
+  --surface-container-high: #292a2e;
+  --surface-container-highest: #343439;
+  --surface-variant: #343439;
+  --on-surface: #e3e2e8;
+  --on-surface-variant: #a8a6ad;
+  --outline: #8c8a92;
+  --outline-variant: #434349;
+  --inverse-surface: #e3e2e8;
+  --inverse-on-surface: #2f3035;
+  --inverse-primary: #be0037;
 
-  --accent: #9b0515;
-  --accent-hover: #c20a1e;
-  --accent-contrast: #ffffff;
-  --accent-secondary: #c9942e;
-  --accent-tertiary: #1f6f78;
+  --primary: #ffb3b6;
+  --on-primary: #68001a;
+  --primary-container: #e11d48;
+  --on-primary-container: #fff5f4;
 
-  --danger: #e5484d;
-  --danger-bg: rgba(229, 72, 77, 0.16);
-  --warn: #d7a23f;
-  --warn-bg: rgba(215, 162, 63, 0.16);
-  --info: #4ab3bd;
-  --info-bg: rgba(74, 179, 189, 0.16);
-  --muted-badge-bg: #2a2d35;
-  --muted-badge-text: #c7cad1;
+  --secondary: #4cd7f6;
+  --on-secondary: #003640;
+  --secondary-container: #03b5d3;
+  --on-secondary-container: #00242b;
 
-  --up: #3fae5c;
-  --up-bg: rgba(63, 174, 92, 0.16);
-  --down: #e5484d;
-  --down-bg: rgba(229, 72, 77, 0.16);
-  --degraded: #d7a23f;
-  --degraded-bg: rgba(215, 162, 63, 0.16);
-  --unknown: #9aa0ac;
-  --unknown-bg: rgba(154, 160, 172, 0.16);
+  --tertiary: #ffb3ad;
+  --on-tertiary: #680009;
+  --tertiary-container: #d53838;
+  --on-tertiary-container: #fff5f4;
+
+  --error: #ffb4ab;
+  --on-error: #690005;
+  --error-container: #93000a;
+  --on-error-container: #ffdad6;
 
   --shadow: 0 1px 2px rgba(0, 0, 0, 0.3), 0 1px 3px rgba(0, 0, 0, 0.4);
-  --radius: 10px;
 }
 
 :root[data-theme="light"] {
-  --bg: #faf7f4;
-  --surface: #ffffff;
-  --surface-muted: #f0ece7;
-  --border: #e3ded8;
-  --text: #1a1410;
-  --text-muted: #6b645d;
+  --background: #f2ecea;
+  --surface: #f2ecea;
+  --surface-dim: #e3d4d3;
+  --surface-bright: #ffffff;
+  --surface-container-lowest: #ffffff;
+  --surface-container-low: #ffffff;
+  --surface-container: #f8f1f0;
+  --surface-container-high: #f1e6e5;
+  --surface-container-highest: #eadcdb;
+  --surface-variant: #eedede;
+  --on-surface: #22191a;
+  --on-surface-variant: #55464a;
+  --outline: #7c6a6c;
+  --outline-variant: #d8c7c6;
+  --inverse-surface: #382e2f;
+  --inverse-on-surface: #ffedee;
+  --inverse-primary: #ffb3b6;
 
-  --accent: #9b0515;
-  --accent-hover: #7e0411;
-  --accent-contrast: #ffffff;
-  --accent-secondary: #92650e;
-  --accent-tertiary: #0f5c63;
+  --primary: #be0037;
+  --on-primary: #ffffff;
+  --primary-container: #ffdada;
+  --on-primary-container: #41000b;
 
-  --danger: #b91c1c;
-  --danger-bg: #fbe4e4;
-  --warn: #92650e;
-  --warn-bg: #f6ecd6;
-  --info: #0f5c63;
-  --info-bg: #dcecee;
-  --muted-badge-bg: #efe9e3;
-  --muted-badge-text: #514b45;
+  --secondary: #006876;
+  --on-secondary: #ffffff;
+  --secondary-container: #aeeeff;
+  --on-secondary-container: #001f24;
 
-  --up: #1f7a3d;
-  --up-bg: #dff1e4;
-  --down: #b91c1c;
-  --down-bg: #fbe4e4;
-  --degraded: #92650e;
-  --degraded-bg: #f6ecd6;
-  --unknown: #6b645d;
-  --unknown-bg: #efe9e3;
+  --tertiary: #a8322a;
+  --on-tertiary: #ffffff;
+  --tertiary-container: #ffdad4;
+  --on-tertiary-container: #400100;
 
-  --shadow: 0 1px 2px rgba(16, 24, 40, 0.05), 0 1px 3px rgba(16, 24, 40, 0.06);
-  --radius: 10px;
+  --error: #ba1a1a;
+  --on-error: #ffffff;
+  --error-container: #ffdad6;
+  --on-error-container: #410002;
+
+  --shadow: 0 1px 2px rgba(80, 30, 30, 0.08), 0 1px 3px rgba(80, 30, 30, 0.08);
 }
 
 html {
-  font: 15px/1.5 "Segoe UI", system-ui, -apple-system, "Arial Hebrew", Arial, sans-serif;
+  font: 15px/1.5 "Inter", "Segoe UI", system-ui, -apple-system, "Arial Hebrew", Arial, sans-serif;
   color-scheme: dark;
 }
 
@@ -90,8 +105,8 @@ html[data-theme="light"] {
 
 body {
   margin: 0;
-  color: var(--text);
-  background: var(--bg);
+  color: var(--on-surface);
+  background: var(--background);
   font-synthesis: none;
   text-rendering: optimizeLegibility;
   -webkit-font-smoothing: antialiased;
@@ -104,4 +119,22 @@ body {
 
 button {
   font-family: inherit;
+}
+
+.material-symbols-outlined {
+  font-variation-settings: "FILL" 0, "wght" 500, "GRAD" 0, "opsz" 20;
+  vertical-align: middle;
+  line-height: 1;
+}
+
+::-webkit-scrollbar {
+  width: 10px;
+  height: 10px;
+}
+::-webkit-scrollbar-thumb {
+  background: var(--surface-container-high);
+  border-radius: 999px;
+}
+::-webkit-scrollbar-track {
+  background: transparent;
 }

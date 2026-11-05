@@ -5,6 +5,12 @@ import TopBar from "./TopBar";
 import { useSidebarState } from "./useSidebarState";
 import { useProjects } from "../projects/ProjectsContext";
 
+const OFFSET: Record<string, string> = {
+  expanded: "pl-72",
+  collapsed: "pl-20",
+  hidden: "pl-0",
+};
+
 export default function Layout() {
   const sidebar = useSidebarState();
   const { projectId } = useParams<{ projectId: string }>();
@@ -20,12 +26,14 @@ export default function Layout() {
   }
 
   return (
-    <div className="shell">
+    <div className="min-h-screen bg-background text-on-surface">
       <Sidebar state={sidebar.state} onCollapseToggle={sidebar.collapseToggle} onHide={sidebar.hide} />
-      <div className="content-area">
+      <div className={`transition-[padding] duration-200 ${OFFSET[sidebar.state]}`}>
         <TopBar sidebarState={sidebar.state} onShowSidebar={sidebar.show} />
-        <main className="app-main">
-          <Outlet />
+        <main className="w-full pt-16 min-h-screen">
+          <div className="max-w-[1400px] mx-auto px-space-md py-space-md flex flex-col gap-space-md">
+            <Outlet />
+          </div>
         </main>
       </div>
     </div>
