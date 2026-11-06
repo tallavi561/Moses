@@ -38,10 +38,11 @@ public class IngestionService {
     }
 
     /** Accepts a log, returns its generated id immediately; indexing happens asynchronously. */
-    public String ingest(String serviceName, int logLevel, String ip, String rawMessage, Instant timestamp) {
+    public String ingest(String serviceName, int logLevel, String ip, String rawMessage, Instant timestamp,
+                          String traceId, String spanId) {
         String logId = new ObjectId().toString();
         Instant effectiveTimestamp = timestamp != null ? timestamp : Instant.now();
-        LogEntry entry = new LogEntry(logId, effectiveTimestamp, serviceName, logLevel, ip, rawMessage);
+        LogEntry entry = new LogEntry(logId, effectiveTimestamp, serviceName, logLevel, ip, rawMessage, traceId, spanId);
 
         ingestionExecutor.submit(() -> processAsync(entry));
         return logId;

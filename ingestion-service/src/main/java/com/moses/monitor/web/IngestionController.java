@@ -28,7 +28,9 @@ public class IngestionController {
                 request.getLogLevel(),
                 request.getIp(),
                 request.getRawMessage(),
-                request.getTimestamp());
+                request.getTimestamp(),
+                request.getTraceId(),
+                request.getSpanId());
         return ResponseEntity.status(HttpStatus.ACCEPTED).body(Map.of("logId", logId));
     }
 }

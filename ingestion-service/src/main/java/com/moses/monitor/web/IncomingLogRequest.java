@@ -21,6 +21,10 @@ public class IncomingLogRequest {
     /** Optional; defaults to server receipt time if omitted. */
     private Instant timestamp;
 
+    /** Optional request-correlation fields - see LogEntry. */
+    private String traceId;
+    private String spanId;
+
     public String getServiceName() {
         return serviceName;
     }
@@ -59,5 +63,21 @@ public class IncomingLogRequest {
 
     public void setTimestamp(Instant timestamp) {
         this.timestamp = timestamp;
+    }
+
+    public String getTraceId() {
+        return traceId;
+    }
+
+    public void setTraceId(String traceId) {
+        this.traceId = traceId;
+    }
+
+    public String getSpanId() {
+        return spanId;
+    }
+
+    public void setSpanId(String spanId) {
+        this.spanId = spanId;
     }
 }

@@ -27,16 +27,31 @@ public class LogEntry {
     @Field("raw_message")
     private String rawMessage;
 
+    /**
+     * Optional request-correlation fields: one traceId per logical request as it crosses
+     * services, one spanId per hop within it. Not populated by any sender yet - added ahead
+     * of real usage so adopting trace correlation later (via the SKILL, or real OpenTelemetry)
+     * doesn't require a schema migration on live data. See VISION.md section 4.
+     */
+    @Field("trace_id")
+    private String traceId;
+
+    @Field("span_id")
+    private String spanId;
+
     public LogEntry() {
     }
 
-    public LogEntry(String logId, Instant timestamp, String serviceName, int logLevel, String ip, String rawMessage) {
+    public LogEntry(String logId, Instant timestamp, String serviceName, int logLevel, String ip, String rawMessage,
+                     String traceId, String spanId) {
         this.logId = logId;
         this.timestamp = timestamp;
         this.serviceName = serviceName;
         this.logLevel = logLevel;
         this.ip = ip;
         this.rawMessage = rawMessage;
+        this.traceId = traceId;
+        this.spanId = spanId;
     }
 
     public String getLogId() {
@@ -85,5 +100,21 @@ public class LogEntry {
 
     public void setRawMessage(String rawMessage) {
         this.rawMessage = rawMessage;
+    }
+
+    public String getTraceId() {
+        return traceId;
+    }
+
+    public void setTraceId(String traceId) {
+        this.traceId = traceId;
+    }
+
+    public String getSpanId() {
+        return spanId;
+    }
+
+    public void setSpanId(String spanId) {
+        this.spanId = spanId;
     }
 }

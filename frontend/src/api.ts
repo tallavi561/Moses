@@ -7,6 +7,8 @@ export interface LogEntry {
   logLevel: number;
   ip: string;
   rawMessage: string;
+  traceId: string | null;
+  spanId: string | null;
 }
 
 export interface ProcessState {
