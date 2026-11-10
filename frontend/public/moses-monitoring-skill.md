@@ -98,11 +98,25 @@ this base URL.
      `5` FATAL.
    - `ip` is optional (the client/request IP, when there is one).
    - `timestamp` is optional (ISO-8601 UTC); omit it and the server stamps receipt time.
-   - Implement this as a logging hook/middleware/transport for whatever logging
-     mechanism the codebase already uses (a logging library handler, an HTTP access-log
-     middleware, etc.) rather than scattering raw `fetch`/`POST` calls through the
-     business logic. Batch and send asynchronously if the logging library supports it -
-     don't block request handling on this call.
+   - **All logging must go through one dedicated `Logger` class** (or the language's
+     equivalent: a module, a wrapper around the existing logging library) that this
+     codebase uses everywhere instead of `print`/`console.log`/`System.out`. That single
+     class is the only place that talks to MoSes: it exposes `trace/debug/info/warn/error/
+     fatal` methods, stamps `serviceName`, level and timestamp, and POSTs to `/api/logs`.
+     If the codebase already has a logging library, build the `Logger` as a thin wrapper/
+     transport on top of it and replace direct `print`/`console` calls with it. Do not
+     scatter raw `fetch`/`POST` calls through the business logic.
+   - The `Logger` must send asynchronously (queue + batch/flush in the background) and
+     never block or throw into request handling. If MoSes is unreachable, fall back to
+     local stdout and drop or retry quietly.
+   - **Every incoming request must be logged through that `Logger`** (and therefore sent
+     to MoSes): add one HTTP middleware/filter/interceptor per service that logs method,
+     path, status code and duration (e.g. `POST /checkout 200 142ms`) at INFO, and 4xx/5xx
+     at WARN/ERROR, including the client `ip`. Also log every outbound call this service
+     makes to another service in `connections` (same format), so traffic between services
+     shows up on both sides.
+   - If the codebase has request/trace IDs, pass them as optional `traceId` / `spanId`
+     fields in the log payload so related logs can be correlated.
    - Don't log secrets, full request/response bodies, or personal data in `rawMessage`.
 
 4. **Double-check the `connections` lists are consistent.** If service A lists B as a
@@ -110,7 +124,8 @@ this base URL.
    direction into one edge). Prefer listing a connection from the caller's side.
 
 5. **Report back to the person running this** what you set up: which services got
-   heartbeats, which got probe URLs instead, and where the logging hook was added - so
+   heartbeats, which got probe URLs instead, where the `Logger` class lives, and where the
+   request-logging middleware was added - so
    they can verify it in the MoSes Architecture and Search pages.
 
 ## What NOT to do

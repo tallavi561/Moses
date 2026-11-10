@@ -73,7 +73,7 @@ export default function ProjectSwitcher({ expanded }: ProjectSwitcherProps) {
       </button>
 
       {open && (
-        <div className="absolute left-0 top-[calc(100%+8px)] w-72 bg-surface-container-low rounded-2xl shadow-2xl p-space-sm z-50 space-y-1">
+        <div className="absolute left-0 top-[calc(100%+8px)] w-60 bg-surface-container-low rounded-2xl shadow-2xl p-space-sm z-50 space-y-1">
           <div className="font-label-sm text-label-sm text-on-surface-variant uppercase px-space-sm py-space-xs">
             {t.projects.switchProject}
           </div>
@@ -95,7 +95,7 @@ export default function ProjectSwitcher({ expanded }: ProjectSwitcherProps) {
           )}
           <div className="h-px bg-outline-variant my-1" />
           {creating ? (
-            <div className="flex items-center gap-space-xs px-space-xs">
+            <div className="flex flex-col gap-space-xs px-space-xs">
               <input
                 type="text"
                 autoFocus
@@ -103,7 +103,7 @@ export default function ProjectSwitcher({ expanded }: ProjectSwitcherProps) {
                 onChange={(e) => setNewName(e.target.value)}
                 onKeyDown={(e) => e.key === "Enter" && handleCreate()}
                 placeholder={t.projects.namePlaceholder}
-                className="flex-1 min-w-0 bg-surface-container-highest text-on-surface font-body-md text-body-md px-space-sm py-1.5 rounded-lg focus:outline-none focus:ring-1 focus:ring-secondary placeholder:text-on-surface-variant"
+                className="w-full min-w-0 bg-surface-container-highest text-on-surface font-body-md text-body-md px-space-sm py-1.5 rounded-lg focus:outline-none focus:ring-1 focus:ring-secondary placeholder:text-on-surface-variant"
               />
               <button
                 className="px-space-sm py-1.5 rounded-lg bg-primary-container text-on-primary-container font-headline text-headline-sm disabled:opacity-40"
