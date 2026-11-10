@@ -1,7 +1,7 @@
 # MoSes Monitor - Architecture & Decision Log
 
 Living document. Captures what the system is, why it's built this way, and which
-decisions are settled vs. still open. Last updated: 2026-10-25.
+decisions are settled vs. still open. Last updated: 2026-11-10.
 
 ## 1. What this is
 
@@ -195,20 +195,83 @@ services doesn't exist yet.
 
 ## 7. What's verified vs. not
 
-**Verified end-to-end** (built, deployed locally, tested through the real UI in a
-browser): ingest a log → search finds it (structured search), NL query → AI service
+**Verified end-to-end** (both locally and on the live Render deployment - see
+§8): ingest a log → search finds it (structured search), NL query → AI service
 → search-service → UI, process heartbeat → flow diagram renders live state. All
 through `api-gateway`, matching the real deployed topology.
 
 **Not yet done:**
-- Actual deployment to Render (services + `render.yaml` are ready; needs a
-  MongoDB Atlas cluster + Render account wiring). Pushed to
-  [github.com/tallavi561/Moses](https://github.com/tallavi561/Moses), `main` branch,
-  but nothing is deployed anywhere yet - everything so far has run locally.
 - Real LLM integration for NL query understanding (currently a rule-based stub)
 - Anomaly detection and summarization logic (currently 501 stubs)
-- A real heartbeat-sending agent for monitored services (process-monitor-service
-  only has the ingest/read API so far)
-- Authentication/authorization (nothing is secured right now - fine for local dev,
-  **not fine before any real deployment**)
-- Frontend styling/UX polish (currently functional but minimal)
+- Real authentication/authorization and backend multi-tenancy (the frontend's
+  login/projects UI is still a mock single-user, localStorage-backed shell -
+  **not fine for a real multi-user deployment**, deliberately deferred)
+- Repo+AI driven topology discovery (see VISION.md §2/§8)
+
+## 8. Render deployment
+
+Live at:
+- Frontend: https://moses-monitor-frontend.onrender.com
+- API gateway (only public backend URL): https://api-gateway-x17f.onrender.com
+
+Deployed as a single Render **Blueprint** from `render.yaml` ("New → Blueprint",
+pointed at this repo). All `fromService`-computed env vars (`*_SERVICE_URL` on
+`api-gateway`) are overridden in the Render dashboard to each downstream
+service's **public** `onrender.com` URL rather than Render's private-network
+`host:port` form - see "Gotchas" below for why.
+
+### MongoDB Atlas
+
+No managed MongoDB on Render, so `MONGODB_URI` points at an external **MongoDB
+Atlas M0 (free)** cluster, region `us-west-2` (AWS), database name
+`moses_monitor`. One DB user (`myproject`) is shared by the three Mongo-backed
+services (`ingestion-service`, `search-service`, `process-monitor-service`).
+**The actual connection string/password lives only in the Render dashboard
+and MongoDB Atlas - never in the repo.** Network Access is `0.0.0.0/0` (allow
+from anywhere), since Render doesn't publish a fixed outbound IP on the free
+tier.
+
+A **Render Environment Group** is the planned next step for `MONGODB_URI`, so
+changing the password means editing one place instead of three services -
+not done yet as of this writing.
+
+### Gotchas hit during the first deploy (read before touching this again)
+
+1. **`fromService`/`hostport` private-network env vars aren't reliable here.**
+   One service (`process-monitor-service`) consistently got a
+   `java.net.UnknownHostException` from `api-gateway` over Render's private
+   network, while its public `onrender.com` URL worked fine. Worked around by
+   pointing all of `api-gateway`'s downstream `*_SERVICE_URL` env vars at the
+   **public** URLs instead of relying on `fromService`/`hostport`. Also:
+   `fromService`/`hostport` only resolves on Render's private network, which a
+   **browser can never reach** - `VITE_API_BASE_URL` (a frontend build-time
+   var) must always be a public URL, set manually (`sync: false`), never
+   `fromService`.
+2. **`VITE_API_BASE_URL` is baked in at *build* time**, not read at runtime -
+   it's a static site. Setting/changing it requires an actual rebuild to take
+   effect; if a deploy reuses a cached build layer, it silently keeps the old
+   (or default `http://localhost:8080`) value. Fixed by using Render's
+   **"Clear cache and deploy"**, not just a regular redeploy, whenever this
+   variable changes or looks stale.
+3. **MongoDB Atlas password changes aren't instant.** A new DB user password
+   can take roughly a minute or two to propagate across all shard nodes of
+   the replica set; testing immediately after a password change can still
+   show `bad auth: authentication failed` even though the new password is
+   correct. Wait a bit before redeploying/retesting after a password change.
+4. **Never load-test or script-probe (`curl` in a loop, etc.) a live
+   `*.onrender.com` URL.** Render's shared free-tier domains sit behind
+   Cloudflare, which can flag a zone for a **Managed Challenge** after bursts
+   of non-browser automated traffic - this can escalate to Cloudflare being
+   unable to even reach the origin to serve the challenge page, affecting
+   *all* visitors (not just the automated client), and didn't clear with
+   simple waiting. The fix that worked: delete and recreate the entire
+   Blueprint, which gives every service a fresh random `onrender.com`
+   subdomain (clean Cloudflare reputation). Test manually, one request at a
+   time, from a real browser.
+5. **MongoDB Atlas free (M0) cluster creation can be blocked by region.** If
+   the cluster-creation screen only offers paid tiers (M10/M30/Flex) with no
+   M0 option, check whether the project already has one Free cluster (only
+   one is allowed per project) before assuming M0 was discontinued - it's
+   usually a prior cluster, possibly auto-paused from inactivity.
+6. Free-tier web services spin down after ~15 minutes of inactivity and take
+   30-50s to wake on the next request - normal, not a bug.
