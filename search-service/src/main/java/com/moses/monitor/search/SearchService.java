@@ -51,16 +51,17 @@ public class SearchService {
     }
 
     public List<LogEntry> search(SearchQuery query) {
-        List<String> bucketKeys = BucketKeyUtil.bucketKeysInRange(query.getFrom(), query.getTo(), bucketGranularityMinutes);
-        if (bucketKeys.isEmpty()) {
-            return List.of();
-        }
-
         boolean noWords = query.getWords() == null || query.getWords().isEmpty();
         if (noWords) {
             // Browse (no words): no index lookup, just the newest logs in the time range,
-            // optionally restricted to one service.
+            // optionally restricted to one service. Bucket keys are never built here - a huge
+            // time range would otherwise allocate one key per bucket for nothing.
             return fetchAndMicroFilter(null, query);
+        }
+
+        List<String> bucketKeys = BucketKeyUtil.bucketKeysInRange(query.getFrom(), query.getTo(), bucketGranularityMinutes);
+        if (bucketKeys.isEmpty()) {
+            return List.of();
         }
 
         Set<String> candidateIds = resolveCandidateIds(query.getWords(), bucketKeys);
@@ -114,14 +115,13 @@ public class SearchService {
      * is repeated per call, but only {@code limit + 1} documents are ever fetched.
      */
     public LogPage searchPage(SearchQuery query, Instant before, String beforeId, int limit) {
-        List<String> bucketKeys = BucketKeyUtil.bucketKeysInRange(query.getFrom(), query.getTo(), bucketGranularityMinutes);
-        if (bucketKeys.isEmpty()) {
-            return new LogPage(List.of(), false);
-        }
-
         boolean noWords = query.getWords() == null || query.getWords().isEmpty();
         Set<String> candidateIds = null;
         if (!noWords) {
+            List<String> bucketKeys = BucketKeyUtil.bucketKeysInRange(query.getFrom(), query.getTo(), bucketGranularityMinutes);
+            if (bucketKeys.isEmpty()) {
+                return new LogPage(List.of(), false);
+            }
             candidateIds = resolveCandidateIds(query.getWords(), bucketKeys);
             if (candidateIds.isEmpty()) {
                 return new LogPage(List.of(), false);

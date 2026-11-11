@@ -19,7 +19,8 @@ $Gateway = "https://api-gateway-x17f.onrender.com"
 # Through the gateway: wakes the gateway plus the service behind each route.
 $Targets = [ordered]@{
     "api-gateway + process-monitor" = "$Gateway/api/process/state"
-    "api-gateway + search-service"  = "$Gateway/api/search/page?limit=1&from=2020-01-01T00:00:00Z&to=2100-01-01T00:00:00Z"
+    # {FROM}/{TO} become "the last hour" on every round (see Resolve-Url).
+    "api-gateway + search-service"  = "$Gateway/api/search/page?limit=1&from={FROM}&to={TO}"
     # The gateway only proxies POST /api/logs, so wake ingestion-service directly (a 404 is fine).
     "ingestion-service"             = "https://ingestion-service-u5ai.onrender.com/"
     # Add ai-service / frontend here if you want them kept warm too, e.g.:
@@ -32,7 +33,13 @@ function Write-Log([string]$Message) {
     Add-Content -Path $LogFile -Value $line
 }
 
-function Ping-Target([string]$Name, [string]$Url) {
+function Resolve-Url([string]$Url) {
+    $now = [DateTime]::UtcNow
+    $Url.Replace("{FROM}", $now.AddHours(-1).ToString("yyyy-MM-ddTHH:mm:ssZ")).Replace("{TO}", $now.ToString("yyyy-MM-ddTHH:mm:ssZ"))
+}
+
+function Ping-Target([string]$Name, [string]$RawUrl) {
+    $Url = Resolve-Url $RawUrl
     $watch = [System.Diagnostics.Stopwatch]::StartNew()
     try {
         $response = Invoke-WebRequest -Uri $Url -UseBasicParsing -TimeoutSec $TimeoutSeconds -ErrorAction Stop
