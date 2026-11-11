@@ -64,6 +64,37 @@ export async function searchLogs(
   return res.json();
 }
 
+export interface LogPage {
+  logs: LogEntry[];
+  hasMore: boolean;
+}
+
+export interface LogPageParams {
+  words: string[];
+  from: string;
+  to: string;
+  service?: string;
+  before?: string;
+  beforeId?: string;
+  limit?: number;
+}
+
+/** One newest-first chunk of logs; pass the last log's timestamp/logId as before/beforeId for the next chunk. */
+export async function searchLogPage(p: LogPageParams): Promise<LogPage> {
+  const params = new URLSearchParams();
+  p.words.forEach((w) => params.append("words", w));
+  params.append("from", p.from);
+  params.append("to", p.to);
+  if (p.service) params.append("service", p.service);
+  if (p.before) params.append("before", p.before);
+  if (p.beforeId) params.append("beforeId", p.beforeId);
+  if (p.limit) params.append("limit", String(p.limit));
+
+  const res = await fetch(`${API_BASE_URL}/api/search/page?${params.toString()}`);
+  if (!res.ok) throw new Error(`Search failed: ${res.status}`);
+  return res.json();
+}
+
 export async function fetchProcessState(): Promise<ProcessState[]> {
   const res = await fetch(`${API_BASE_URL}/api/process/state`);
   if (!res.ok) throw new Error(`Process state fetch failed: ${res.status}`);

@@ -1,7 +1,11 @@
 import { useEffect, useState } from "react";
-import { askAi, fetchProcessState, searchLogs, type LogEntry } from "../api";
+import { askAi, fetchProcessState, type LogEntry } from "../api";
 import { useLanguage, pluralize } from "../i18n/LanguageContext";
 import { Icon } from "../icons";
+import { useServerLogs, type ServerQuery } from "../useServerLogs";
+
+const PAGE_SIZE = 20;
+const FEED_REFRESH_MS = 10000;
 
 const LEVEL_LABEL: Record<number, string> = {
   0: "TRACE",
@@ -69,7 +73,7 @@ function LogJsonList({ logs }: { logs: LogEntry[] }) {
       {logs.map((log) => (
         <pre
           key={log.logId}
-          className="font-code text-code-sm text-on-surface bg-surface-container/60 rounded-xl px-space-md py-space-sm overflow-x-auto whitespace-pre-wrap break-words"
+          className="font-code text-code-sm text-on-surface bg-surface-container rounded-xl px-space-md py-space-sm overflow-x-auto whitespace-pre-wrap break-words cursor-default transition-all duration-200 ease-out hover:bg-surface-container-high hover:shadow-md hover:translate-x-0.5"
         >
           {JSON.stringify(parseLogToJson(log), null, 2)}
         </pre>
@@ -78,12 +82,169 @@ function LogJsonList({ logs }: { logs: LogEntry[] }) {
   );
 }
 
+function LogTable({ logs }: { logs: LogEntry[] }) {
+  const { t, lang } = useLanguage();
+  return (
+    <div className="overflow-x-auto rounded-xl">
+      <table className="w-full border-collapse">
+        <thead>
+          <tr className="text-left">
+            {[t.search.columns.time, t.search.columns.service, t.search.columns.level, t.search.columns.ip, t.search.columns.message].map(
+              (label) => (
+                <th key={label} className="font-label-sm text-label-sm text-on-surface-variant uppercase px-space-sm py-space-xs">
+                  {label}
+                </th>
+              )
+            )}
+          </tr>
+        </thead>
+        <tbody>
+          {logs.map((log) => (
+            <tr key={log.logId} className="odd:bg-surface-container/40 hover:bg-surface-container-high transition-colors">
+              <td className="font-code text-code-sm text-on-surface-variant px-space-sm py-space-xs whitespace-nowrap">
+                {new Date(log.timestamp).toLocaleString(lang === "he" ? "he-IL" : "en-US")}
+              </td>
+              <td className="font-body-sm text-body-sm text-on-surface px-space-sm py-space-xs whitespace-nowrap">
+                {log.serviceName}
+              </td>
+              <td className="px-space-sm py-space-xs">
+                <LevelBadge level={log.logLevel} />
+              </td>
+              <td className="font-code text-code-sm text-on-surface-variant px-space-sm py-space-xs whitespace-nowrap">
+                {log.ip}
+              </td>
+              <td className="font-code text-code-sm text-on-surface px-space-sm py-space-xs">{log.rawMessage}</td>
+            </tr>
+          ))}
+        </tbody>
+      </table>
+    </div>
+  );
+}
+
+/** Page numbers to show: first, last, and a window around the current page, with gaps as null. */
+function pageWindow(current: number, total: number): (number | null)[] {
+  const wanted = new Set<number>([0, total - 1]);
+  for (let i = current - 2; i <= current + 2; i++) {
+    if (i >= 0 && i < total) wanted.add(i);
+  }
+  const sorted = [...wanted].sort((a, b) => a - b);
+  const result: (number | null)[] = [];
+  sorted.forEach((p, i) => {
+    if (i > 0 && p - sorted[i - 1] > 1) result.push(null);
+    result.push(p);
+  });
+  return result;
+}
+
+interface PagedLogListProps {
+  logs: LogEntry[];
+  hasMore: boolean;
+  loading: boolean;
+  loadMore: () => void;
+  /** Page goes back to 1 whenever this changes (a new query). */
+  resetKey: string;
+  view: "json" | "table";
+  onRefresh?: () => void;
+}
+
+/**
+ * Shows PAGE_SIZE logs at a time out of the logs already cached by the caller. Moving between
+ * loaded pages makes no request; when the viewed page gets within one page of the end of the
+ * cache, the next chunk is fetched in the background so the following page is ready.
+ */
+function PagedLogList({ logs, hasMore, loading, loadMore, resetKey, view, onRefresh }: PagedLogListProps) {
+  const [page, setPage] = useState(0);
+
+  useEffect(() => setPage(0), [resetKey]);
+
+  const loadedPages = Math.max(1, Math.ceil(logs.length / PAGE_SIZE));
+  const current = Math.min(page, loadedPages - 1);
+
+  useEffect(() => {
+    if (hasMore && !loading && (current + 2) * PAGE_SIZE > logs.length) loadMore();
+  }, [current, hasMore, loading, logs.length, loadMore]);
+
+  useEffect(() => {
+    if (!onRefresh || current !== 0) return;
+    const interval = setInterval(onRefresh, FEED_REFRESH_MS);
+    return () => clearInterval(interval);
+  }, [onRefresh, current]);
+
+  const pageLogs = logs.slice(current * PAGE_SIZE, (current + 1) * PAGE_SIZE);
+  const atLastLoaded = current >= loadedPages - 1;
+  const showPager = loadedPages > 1 || hasMore;
+
+  const pageButton =
+    "min-w-8 h-8 px-2 rounded-lg font-code text-code-sm transition-colors flex items-center justify-center";
+
+  return (
+    <>
+      {view === "json" ? <LogJsonList logs={pageLogs} /> : <LogTable logs={pageLogs} />}
+
+      {showPager && (
+        <div className="flex items-center justify-center gap-1 mt-space-md flex-wrap">
+          <button
+            type="button"
+            className={`${pageButton} text-on-surface-variant hover:bg-surface-container-high disabled:opacity-30 disabled:hover:bg-transparent`}
+            onClick={() => setPage(current - 1)}
+            disabled={current === 0}
+            aria-label="Previous page"
+          >
+            <Icon name="chevron_left" size={18} />
+          </button>
+
+          {pageWindow(current, loadedPages).map((p, i) =>
+            p === null ? (
+              <span key={`gap-${i}`} className="text-on-surface-variant px-1">
+                …
+              </span>
+            ) : (
+              <button
+                key={p}
+                type="button"
+                className={`${pageButton} ${
+                  p === current
+                    ? "bg-primary-container text-on-primary-container"
+                    : "text-on-surface-variant hover:bg-surface-container-high"
+                }`}
+                onClick={() => setPage(p)}
+                aria-current={p === current ? "page" : undefined}
+              >
+                {p + 1}
+              </button>
+            )
+          )}
+
+          {hasMore && (
+            <span className={`${pageButton} text-on-surface-variant`} title="More logs available">
+              {loading ? <Icon name="progress_activity" size={16} className="animate-spin text-secondary" /> : "…"}
+            </span>
+          )}
+
+          <button
+            type="button"
+            className={`${pageButton} text-on-surface-variant hover:bg-surface-container-high disabled:opacity-30 disabled:hover:bg-transparent`}
+            onClick={() => setPage(current + 1)}
+            disabled={atLastLoaded}
+            aria-label="Next page"
+          >
+            <Icon name="chevron_right" size={18} />
+          </button>
+        </div>
+      )}
+    </>
+  );
+}
+
 type SearchMode = "structured" | "ai";
 
 const SEARCH_MODE_KEY = "moses.search.mode";
 
+const FEED_QUERY: ServerQuery = { words: [] };
+
 export default function SearchPage() {
-  const { t, lang } = useLanguage();
+  const { t } = useLanguage();
   const [searchMode, setSearchMode] = useState<SearchMode>(() => {
     try {
       return localStorage.getItem(SEARCH_MODE_KEY) === "ai" ? "ai" : "structured";
@@ -94,13 +255,16 @@ export default function SearchPage() {
   const [wordsInput, setWordsInput] = useState("");
   const [serviceFilter, setServiceFilter] = useState("");
   const [serviceNames, setServiceNames] = useState<string[]>([]);
-  const [recent, setRecent] = useState<LogEntry[] | null>(null);
-  const [resultsView, setResultsView] = useState<"json" | "table">("json");
   const [nlQuestion, setNlQuestion] = useState("");
-  const [results, setResults] = useState<LogEntry[] | null>(null);
+  const [structuredQuery, setStructuredQuery] = useState<ServerQuery | null>(null);
+  const [aiResults, setAiResults] = useState<LogEntry[] | null>(null);
+  const [aiLoading, setAiLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const [loading, setLoading] = useState(false);
   const [lastMode, setLastMode] = useState<"structured" | "ai" | null>(null);
+  const [resultsView, setResultsView] = useState<"json" | "table">("json");
+
+  const feed = useServerLogs(FEED_QUERY);
+  const search = useServerLogs(structuredQuery);
 
   useEffect(() => {
     fetchProcessState()
@@ -108,46 +272,16 @@ export default function SearchPage() {
       .catch(() => setServiceNames([]));
   }, []);
 
-  useEffect(() => {
-    let cancelled = false;
-    async function loadRecent() {
-      try {
-        const to = new Date().toISOString();
-        const from = new Date(Date.now() - 24 * 60 * 60 * 1000).toISOString();
-        const logs = await searchLogs([], from, to);
-        if (!cancelled) setRecent(logs.slice(-200).reverse());
-      } catch {
-        // keep the previous list; the next tick retries
-      }
-    }
-    loadRecent();
-    const interval = setInterval(loadRecent, 10000);
-    return () => {
-      cancelled = true;
-      clearInterval(interval);
-    };
-  }, []);
-
-  async function runStructuredSearch() {
+  function runStructuredSearch() {
     const words = wordsInput.split(/\s+/).filter(Boolean);
     if (words.length === 0 && !serviceFilter) {
       setError(t.search.needsWord);
       return;
     }
-    setLoading(true);
     setError(null);
     setLastMode("structured");
-    try {
-      const to = new Date().toISOString();
-      const from = new Date(Date.now() - 24 * 60 * 60 * 1000).toISOString();
-      const res = await searchLogs(words, from, to, undefined, serviceFilter || undefined);
-      setResults(res);
-    } catch (e) {
-      setError(`${t.search.errorPrefix}: ${(e as Error).message}`);
-      setResults(null);
-    } finally {
-      setLoading(false);
-    }
+    setAiResults(null);
+    setStructuredQuery({ words, service: serviceFilter || undefined, nonce: Date.now() });
   }
 
   async function runNlQuery() {
@@ -155,18 +289,19 @@ export default function SearchPage() {
       setError(t.search.needsQuestion);
       return;
     }
-    setLoading(true);
+    setAiLoading(true);
     setError(null);
     setLastMode("ai");
+    setStructuredQuery(null);
     try {
       const res = await askAi(nlQuestion);
       const typed = res as { results?: LogEntry[] };
-      setResults(typed.results ?? []);
+      setAiResults([...(typed.results ?? [])].reverse());
     } catch (e) {
       setError(`${t.search.aiErrorPrefix}: ${(e as Error).message}`);
-      setResults(null);
+      setAiResults(null);
     } finally {
-      setLoading(false);
+      setAiLoading(false);
     }
   }
 
@@ -182,6 +317,46 @@ export default function SearchPage() {
       // ignore
     }
   }
+
+  const showFeed = lastMode === null;
+  const showAi = lastMode === "ai";
+  const searchError = lastMode === "structured" && search.error ? `${t.search.errorPrefix}: ${search.error}` : null;
+  const visibleError = error ?? searchError;
+
+  const resultsLoading = showAi ? aiLoading : !search.loaded && search.loading;
+  const resultCount = showAi ? aiResults?.length ?? 0 : search.logs.length;
+
+  const viewToggle = (
+    <div className="flex items-center bg-surface-container-high rounded-lg p-0.5" role="radiogroup">
+      {(["json", "table"] as const).map((view) => (
+        <button
+          key={view}
+          type="button"
+          className={`px-space-sm py-0.5 rounded-md font-code text-code-sm transition-all ${
+            resultsView === view ? "bg-surface text-secondary" : "text-on-surface-variant hover:text-on-surface"
+          }`}
+          onClick={() => setResultsView(view)}
+          aria-pressed={resultsView === view}
+        >
+          {view === "json" ? t.search.viewJson : t.search.viewTable}
+        </button>
+      ))}
+    </div>
+  );
+
+  const spinner = (
+    <div className="flex items-center gap-space-sm font-body-md text-body-md text-on-surface-variant py-space-md">
+      <Icon name="progress_activity" size={18} className="animate-spin text-secondary" />
+      {t.search.loading}
+    </div>
+  );
+
+  const empty = (message: string) => (
+    <div className="flex flex-col items-center gap-space-xs py-space-xl text-on-surface-variant">
+      <Icon name="search_off" size={28} />
+      <span className="font-body-md text-body-md">{message}</span>
+    </div>
+  );
 
   return (
     <>
@@ -250,7 +425,7 @@ export default function SearchPage() {
               <button
                 className="shrink-0 flex items-center gap-1.5 px-space-md py-space-sm rounded-xl bg-primary-container hover:bg-inverse-primary text-on-primary-container font-headline text-headline-sm transition-all disabled:opacity-40"
                 onClick={runStructuredSearch}
-                disabled={loading}
+                disabled={search.loading && !search.loaded}
                 type="button"
               >
                 <Icon name="search" size={18} />
@@ -284,7 +459,7 @@ export default function SearchPage() {
               <button
                 className="shrink-0 flex items-center gap-1.5 px-space-md py-space-sm rounded-xl bg-surface-container-high hover:bg-surface-bright text-on-surface font-headline text-headline-sm transition-colors disabled:opacity-40"
                 onClick={runNlQuery}
-                disabled={loading}
+                disabled={aiLoading}
                 type="button"
               >
                 <Icon name="send" size={16} className="text-secondary" />
@@ -295,120 +470,81 @@ export default function SearchPage() {
         )}
       </div>
 
-      {error && (
+      {visibleError && (
         <div className="flex items-center gap-space-sm bg-error-container/20 text-error px-space-md py-space-sm rounded-xl font-body-md text-body-md">
           <Icon name="error" size={18} />
-          {error}
+          {visibleError}
         </div>
       )}
 
-      {results === null && !loading && recent !== null && (
+      {showFeed && feed.loaded && (
         <div className="bg-surface-container-low rounded-2xl shadow-sm p-space-lg">
           <div className="flex items-center justify-between mb-space-sm">
             <h2 className="font-headline text-headline-md text-on-surface">{t.search.recentTitle}</h2>
             <span className="font-code text-code-sm text-on-surface-variant bg-surface-container px-space-sm py-0.5 rounded-full">
-              {pluralize(t.search.results_one, t.search.results_other, recent.length)}
+              {feed.logs.length}
+              {feed.hasMore ? "+" : ""}
             </span>
           </div>
-          {recent.length === 0 ? (
-            <div className="flex flex-col items-center gap-space-xs py-space-xl text-on-surface-variant">
-              <Icon name="search_off" size={28} />
-              <span className="font-body-md text-body-md">{t.search.recentEmpty}</span>
-            </div>
+          {feed.logs.length === 0 ? (
+            empty(t.search.recentEmpty)
           ) : (
-            <LogJsonList logs={recent} />
+            <PagedLogList
+              logs={feed.logs}
+              hasMore={feed.hasMore}
+              loading={feed.loading}
+              loadMore={feed.loadMore}
+              resetKey="feed"
+              view="json"
+              onRefresh={feed.refresh}
+            />
           )}
         </div>
       )}
 
-      {(results !== null || loading) && (
+      {!showFeed && (
         <div className="bg-surface-container-low rounded-2xl shadow-sm p-space-lg">
           <div className="flex items-center justify-between mb-space-sm">
             <h2 className="font-headline text-headline-md text-on-surface">
-              {lastMode === "ai" ? t.search.resultsTitleAi : t.search.resultsTitle}
+              {showAi ? t.search.resultsTitleAi : t.search.resultsTitle}
             </h2>
             <div className="flex items-center gap-space-sm">
-              {!loading && results !== null && (
+              {!resultsLoading && (
                 <span className="font-code text-code-sm text-on-surface-variant bg-surface-container px-space-sm py-0.5 rounded-full">
-                  {pluralize(t.search.results_one, t.search.results_other, results.length)}
+                  {showAi || !search.hasMore
+                    ? pluralize(t.search.results_one, t.search.results_other, resultCount)
+                    : `${resultCount}+`}
                 </span>
               )}
-              <div className="flex items-center bg-surface-container-high rounded-lg p-0.5" role="radiogroup">
-                {(["json", "table"] as const).map((view) => (
-                  <button
-                    key={view}
-                    type="button"
-                    className={`px-space-sm py-0.5 rounded-md font-code text-code-sm transition-all ${
-                      resultsView === view ? "bg-surface text-secondary" : "text-on-surface-variant hover:text-on-surface"
-                    }`}
-                    onClick={() => setResultsView(view)}
-                    aria-pressed={resultsView === view}
-                  >
-                    {view === "json" ? t.search.viewJson : t.search.viewTable}
-                  </button>
-                ))}
-              </div>
+              {viewToggle}
             </div>
           </div>
 
-          {loading || results === null ? (
-            <div className="flex items-center gap-space-sm font-body-md text-body-md text-on-surface-variant py-space-md">
-              <Icon name="progress_activity" size={18} className="animate-spin text-secondary" />
-              {t.search.loading}
-            </div>
-          ) : results.length === 0 ? (
-            <div className="flex flex-col items-center gap-space-xs py-space-xl text-on-surface-variant">
-              <Icon name="search_off" size={28} />
-              <span className="font-body-md text-body-md">{t.search.empty}</span>
-            </div>
-          ) : resultsView === "json" ? (
-            <LogJsonList logs={results} />
-          ) : (
-            <div className="overflow-x-auto rounded-xl">
-              <table className="w-full border-collapse">
-                <thead>
-                  <tr className="text-left">
-                    <th className="font-label-sm text-label-sm text-on-surface-variant uppercase px-space-sm py-space-xs">
-                      {t.search.columns.time}
-                    </th>
-                    <th className="font-label-sm text-label-sm text-on-surface-variant uppercase px-space-sm py-space-xs">
-                      {t.search.columns.service}
-                    </th>
-                    <th className="font-label-sm text-label-sm text-on-surface-variant uppercase px-space-sm py-space-xs">
-                      {t.search.columns.level}
-                    </th>
-                    <th className="font-label-sm text-label-sm text-on-surface-variant uppercase px-space-sm py-space-xs">
-                      {t.search.columns.ip}
-                    </th>
-                    <th className="font-label-sm text-label-sm text-on-surface-variant uppercase px-space-sm py-space-xs">
-                      {t.search.columns.message}
-                    </th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {results.map((log) => (
-                    <tr key={log.logId} className="odd:bg-surface-container/40 hover:bg-surface-container-high transition-colors">
-                      <td className="font-code text-code-sm text-on-surface-variant px-space-sm py-space-xs whitespace-nowrap">
-                        {new Date(log.timestamp).toLocaleString(lang === "he" ? "he-IL" : "en-US")}
-                      </td>
-                      <td className="font-body-sm text-body-sm text-on-surface px-space-sm py-space-xs whitespace-nowrap">
-                        {log.serviceName}
-                      </td>
-                      <td className="px-space-sm py-space-xs">
-                        <LevelBadge level={log.logLevel} />
-                      </td>
-                      <td className="font-code text-code-sm text-on-surface-variant px-space-sm py-space-xs whitespace-nowrap">
-                        {log.ip}
-                      </td>
-                      <td className="font-code text-code-sm text-on-surface px-space-sm py-space-xs">
-                        {log.rawMessage}
-                      </td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-            </div>
-          )}
+          {resultsLoading
+            ? spinner
+            : resultCount === 0
+              ? empty(t.search.empty)
+              : showAi
+                ? (
+                  <PagedLogList
+                    logs={aiResults ?? []}
+                    hasMore={false}
+                    loading={false}
+                    loadMore={() => undefined}
+                    resetKey={`ai-${nlQuestion}`}
+                    view={resultsView}
+                  />
+                )
+                : (
+                  <PagedLogList
+                    logs={search.logs}
+                    hasMore={search.hasMore}
+                    loading={search.loading}
+                    loadMore={search.loadMore}
+                    resetKey={JSON.stringify(structuredQuery)}
+                    view={resultsView}
+                  />
+                )}
         </div>
       )}
     </>
