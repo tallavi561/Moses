@@ -10,12 +10,19 @@ import org.springframework.data.mongodb.core.query.Criteria;
 import org.springframework.data.mongodb.core.query.Query;
 import org.springframework.stereotype.Service;
 
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+
 import java.time.Instant;
 import java.util.ArrayList;
 import java.util.Comparator;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Set;
+import java.util.concurrent.ExecutionException;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
+import java.util.concurrent.Future;
 
 /**
  * Implements the search flow from project_specification.md:
@@ -26,6 +33,8 @@ import java.util.Set;
  */
 @Service
 public class SearchService {
+
+    private static final Logger log = LoggerFactory.getLogger(SearchService.class);
 
     private static final int MAX_BROWSE_RESULTS = 1000;
 
@@ -54,22 +63,49 @@ public class SearchService {
             return fetchAndMicroFilter(null, query);
         }
 
-        Set<String> candidateIds = null;
-        for (String rawWord : query.getWords()) {
-            String normalizedWord = normalize(rawWord);
-            Set<String> idsForWord = idsForWordInBuckets(normalizedWord, bucketKeys);
-
-            if (candidateIds == null) {
-                candidateIds = idsForWord;
-            } else {
-                candidateIds.retainAll(idsForWord);
-            }
-            if (candidateIds.isEmpty()) {
-                return List.of();
-            }
+        Set<String> candidateIds = resolveCandidateIds(query.getWords(), bucketKeys);
+        if (candidateIds.isEmpty()) {
+            return List.of();
         }
 
         return fetchAndMicroFilter(candidateIds, query);
+    }
+
+    /**
+     * Index phase: loads the id set of every word concurrently (each is an independent Mongo
+     * round trip over up to one key per time bucket), then intersects them starting from the
+     * smallest set so the work is bounded by the rarest word, not the most common one.
+     */
+    private Set<String> resolveCandidateIds(List<String> rawWords, List<String> bucketKeys) {
+        long start = System.nanoTime();
+        List<String> words = rawWords.stream().map(this::normalize).distinct().toList();
+
+        List<Set<String>> idSets;
+        try (ExecutorService executor = Executors.newVirtualThreadPerTaskExecutor()) {
+            List<Future<Set<String>>> futures = words.stream()
+                    .map(word -> executor.submit(() -> idsForWordInBuckets(word, bucketKeys)))
+                    .toList();
+            idSets = new ArrayList<>();
+            for (Future<Set<String>> future : futures) {
+                idSets.add(future.get());
+            }
+        } catch (InterruptedException e) {
+            Thread.currentThread().interrupt();
+            throw new IllegalStateException("Search interrupted", e);
+        } catch (ExecutionException e) {
+            throw new IllegalStateException("Index lookup failed", e.getCause());
+        }
+
+        idSets.sort(Comparator.comparingInt(Set::size));
+        Set<String> candidates = new HashSet<>(idSets.get(0));
+        for (int i = 1; i < idSets.size() && !candidates.isEmpty(); i++) {
+            candidates.retainAll(idSets.get(i));
+        }
+
+        log.info("index phase: {} word(s) over {} bucket(s), set sizes {} -> {} candidate(s) in {} ms",
+                words.size(), bucketKeys.size(), idSets.stream().map(Set::size).toList(),
+                candidates.size(), (System.nanoTime() - start) / 1_000_000);
+        return candidates;
     }
 
     /**
@@ -86,16 +122,9 @@ public class SearchService {
         boolean noWords = query.getWords() == null || query.getWords().isEmpty();
         Set<String> candidateIds = null;
         if (!noWords) {
-            for (String rawWord : query.getWords()) {
-                Set<String> idsForWord = idsForWordInBuckets(normalize(rawWord), bucketKeys);
-                if (candidateIds == null) {
-                    candidateIds = idsForWord;
-                } else {
-                    candidateIds.retainAll(idsForWord);
-                }
-                if (candidateIds.isEmpty()) {
-                    return new LogPage(List.of(), false);
-                }
+            candidateIds = resolveCandidateIds(query.getWords(), bucketKeys);
+            if (candidateIds.isEmpty()) {
+                return new LogPage(List.of(), false);
             }
         }
 
@@ -126,7 +155,9 @@ public class SearchService {
                         org.springframework.data.domain.Sort.Order.desc("_id")))
                 .limit(limit + 1);
 
+        long fetchStart = System.nanoTime();
         List<LogEntry> fetched = mongoTemplate.find(mongoQuery, LogEntry.class);
+        log.info("fetch phase: {} log(s) in {} ms", fetched.size(), (System.nanoTime() - fetchStart) / 1_000_000);
         boolean hasMore = fetched.size() > limit;
         return new LogPage(hasMore ? fetched.subList(0, limit) : fetched, hasMore);
     }
@@ -138,6 +169,7 @@ public class SearchService {
 
     private Set<String> idsForWordInBuckets(String word, List<String> bucketKeys) {
         Query q = Query.query(Criteria.where("word").is(word).and("bucket").in(bucketKeys));
+        q.fields().include("log_ids");
         List<IndexBucket> buckets = mongoTemplate.find(q, IndexBucket.class);
 
         Set<String> ids = new HashSet<>();
