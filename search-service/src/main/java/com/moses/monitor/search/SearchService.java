@@ -49,8 +49,9 @@ public class SearchService {
 
         boolean noWords = query.getWords() == null || query.getWords().isEmpty();
         if (noWords) {
-            // Service-only browse: no index lookup, just the service's logs in the time range.
-            return query.getServiceName() == null ? List.of() : fetchAndMicroFilter(null, query);
+            // Browse (no words): no index lookup, just the newest logs in the time range,
+            // optionally restricted to one service.
+            return fetchAndMicroFilter(null, query);
         }
 
         Set<String> candidateIds = null;

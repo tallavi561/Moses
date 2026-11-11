@@ -33,6 +33,51 @@ function LevelBadge({ level }: { level: number }) {
   );
 }
 
+function parseLogToJson(log: LogEntry): Record<string, unknown> {
+  const base: Record<string, unknown> = {
+    ts: log.timestamp,
+    service: log.serviceName,
+    level: LEVEL_LABEL[log.logLevel] ?? log.logLevel,
+  };
+  if (log.traceId) base.traceId = log.traceId;
+  if (log.spanId) base.spanId = log.spanId;
+
+  const raw = log.rawMessage ?? "";
+  const brace = raw.indexOf("{");
+  if (brace >= 0) {
+    try {
+      const payload = JSON.parse(raw.slice(brace));
+      if (payload && typeof payload === "object" && !Array.isArray(payload)) {
+        const prefix = raw.slice(0, brace).trim();
+        if (prefix) base.event = prefix;
+        for (const [key, value] of Object.entries(payload as Record<string, unknown>)) {
+          if (key !== "ts" && key !== "service") base[key] = value;
+        }
+        return base;
+      }
+    } catch {
+      // not JSON - fall through to the plain message
+    }
+  }
+  base.message = raw;
+  return base;
+}
+
+function LogJsonList({ logs }: { logs: LogEntry[] }) {
+  return (
+    <div className="flex flex-col gap-space-xs">
+      {logs.map((log) => (
+        <pre
+          key={log.logId}
+          className="font-code text-code-sm text-on-surface bg-surface-container/60 rounded-xl px-space-md py-space-sm overflow-x-auto whitespace-pre-wrap break-words"
+        >
+          {JSON.stringify(parseLogToJson(log), null, 2)}
+        </pre>
+      ))}
+    </div>
+  );
+}
+
 type SearchMode = "structured" | "ai";
 
 const SEARCH_MODE_KEY = "moses.search.mode";
@@ -49,6 +94,8 @@ export default function SearchPage() {
   const [wordsInput, setWordsInput] = useState("");
   const [serviceFilter, setServiceFilter] = useState("");
   const [serviceNames, setServiceNames] = useState<string[]>([]);
+  const [recent, setRecent] = useState<LogEntry[] | null>(null);
+  const [resultsView, setResultsView] = useState<"json" | "table">("json");
   const [nlQuestion, setNlQuestion] = useState("");
   const [results, setResults] = useState<LogEntry[] | null>(null);
   const [error, setError] = useState<string | null>(null);
@@ -59,6 +106,26 @@ export default function SearchPage() {
     fetchProcessState()
       .then((nodes) => setServiceNames(nodes.map((n) => n.serviceName).sort()))
       .catch(() => setServiceNames([]));
+  }, []);
+
+  useEffect(() => {
+    let cancelled = false;
+    async function loadRecent() {
+      try {
+        const to = new Date().toISOString();
+        const from = new Date(Date.now() - 24 * 60 * 60 * 1000).toISOString();
+        const logs = await searchLogs([], from, to);
+        if (!cancelled) setRecent(logs.slice(-200).reverse());
+      } catch {
+        // keep the previous list; the next tick retries
+      }
+    }
+    loadRecent();
+    const interval = setInterval(loadRecent, 10000);
+    return () => {
+      cancelled = true;
+      clearInterval(interval);
+    };
   }, []);
 
   async function runStructuredSearch() {
@@ -235,17 +302,53 @@ export default function SearchPage() {
         </div>
       )}
 
+      {results === null && !loading && recent !== null && (
+        <div className="bg-surface-container-low rounded-2xl shadow-sm p-space-lg">
+          <div className="flex items-center justify-between mb-space-sm">
+            <h2 className="font-headline text-headline-md text-on-surface">{t.search.recentTitle}</h2>
+            <span className="font-code text-code-sm text-on-surface-variant bg-surface-container px-space-sm py-0.5 rounded-full">
+              {pluralize(t.search.results_one, t.search.results_other, recent.length)}
+            </span>
+          </div>
+          {recent.length === 0 ? (
+            <div className="flex flex-col items-center gap-space-xs py-space-xl text-on-surface-variant">
+              <Icon name="search_off" size={28} />
+              <span className="font-body-md text-body-md">{t.search.recentEmpty}</span>
+            </div>
+          ) : (
+            <LogJsonList logs={recent} />
+          )}
+        </div>
+      )}
+
       {(results !== null || loading) && (
         <div className="bg-surface-container-low rounded-2xl shadow-sm p-space-lg">
           <div className="flex items-center justify-between mb-space-sm">
             <h2 className="font-headline text-headline-md text-on-surface">
               {lastMode === "ai" ? t.search.resultsTitleAi : t.search.resultsTitle}
             </h2>
-            {!loading && results !== null && (
-              <span className="font-code text-code-sm text-on-surface-variant bg-surface-container px-space-sm py-0.5 rounded-full">
-                {pluralize(t.search.results_one, t.search.results_other, results.length)}
-              </span>
-            )}
+            <div className="flex items-center gap-space-sm">
+              {!loading && results !== null && (
+                <span className="font-code text-code-sm text-on-surface-variant bg-surface-container px-space-sm py-0.5 rounded-full">
+                  {pluralize(t.search.results_one, t.search.results_other, results.length)}
+                </span>
+              )}
+              <div className="flex items-center bg-surface-container-high rounded-lg p-0.5" role="radiogroup">
+                {(["json", "table"] as const).map((view) => (
+                  <button
+                    key={view}
+                    type="button"
+                    className={`px-space-sm py-0.5 rounded-md font-code text-code-sm transition-all ${
+                      resultsView === view ? "bg-surface text-secondary" : "text-on-surface-variant hover:text-on-surface"
+                    }`}
+                    onClick={() => setResultsView(view)}
+                    aria-pressed={resultsView === view}
+                  >
+                    {view === "json" ? t.search.viewJson : t.search.viewTable}
+                  </button>
+                ))}
+              </div>
+            </div>
           </div>
 
           {loading || results === null ? (
@@ -258,6 +361,8 @@ export default function SearchPage() {
               <Icon name="search_off" size={28} />
               <span className="font-body-md text-body-md">{t.search.empty}</span>
             </div>
+          ) : resultsView === "json" ? (
+            <LogJsonList logs={results} />
           ) : (
             <div className="overflow-x-auto rounded-xl">
               <table className="w-full border-collapse">

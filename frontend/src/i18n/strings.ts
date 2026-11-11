@@ -34,6 +34,10 @@ export const strings = {
       aiErrorPrefix: "AI query failed",
       needsWord: "Enter at least one search word or pick a service",
       allServices: "All services",
+      recentTitle: "Latest logs",
+      recentEmpty: "No logs received in the last 24h",
+      viewJson: "JSON",
+      viewTable: "Table",
       serviceFilter: "Service",
       needsQuestion: "Enter a question",
       columns: {
@@ -162,6 +166,10 @@ export const strings = {
       aiErrorPrefix: "שאילתת ה-AI נכשלה",
       needsWord: "יש להזין לפחות מילת חיפוש אחת או לבחור שירות",
       allServices: "כל השירותים",
+      recentTitle: "הלוגים האחרונים",
+      recentEmpty: "לא התקבלו לוגים ב-24 השעות האחרונות",
+      viewJson: "JSON",
+      viewTable: "טבלה",
       serviceFilter: "שירות",
       needsQuestion: "יש להזין שאלה",
       columns: {
