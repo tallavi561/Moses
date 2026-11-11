@@ -11,3 +11,4 @@ frontend/dist/
 
 # Word lock files (not real content)
 ~$*.docx
+scripts/keepalive.log
