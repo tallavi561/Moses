@@ -138,3 +138,31 @@ button {
 ::-webkit-scrollbar-track {
   background: transparent;
 }
+
+/*
+ * Animated logo: a sprite of 9 square frames side by side (src/assets/logo-sprite.png, built by
+ * scripts/make-logo-assets.py). Resting state shows the LAST frame; --play steps through all
+ * frames once (9 frames x 220ms, like the source GIF) and holds on the last one.
+ */
+.logo-sprite {
+  background-repeat: no-repeat;
+  background-size: 900% 100%;
+  background-position: 100% 0;
+}
+.logo-sprite--play {
+  /* jump-none: 9 evenly held states, first and last included -> each frame shows 220ms */
+  animation: logo-play 1.98s steps(9, jump-none) 1 forwards;
+}
+@keyframes logo-play {
+  from {
+    background-position: 0% 0;
+  }
+  to {
+    background-position: 100% 0;
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .logo-sprite--play {
+    animation: none;
+  }
+}

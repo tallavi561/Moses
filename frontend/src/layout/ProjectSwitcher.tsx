@@ -4,6 +4,7 @@ import { useProjects } from "../projects/ProjectsContext";
 import { useLanguage } from "../i18n/LanguageContext";
 import { useOnClickOutside } from "./useOnClickOutside";
 import { Icon } from "../icons";
+import AnimatedLogo from "../components/AnimatedLogo";
 
 interface ProjectSwitcherProps {
   expanded: boolean;
@@ -49,10 +50,7 @@ export default function ProjectSwitcher({ expanded }: ProjectSwitcherProps) {
         title={t.projects.switchProject}
         type="button"
       >
-        <div className="w-9 h-9 rounded-xl bg-surface-container-high flex items-center justify-center relative shrink-0">
-          <Icon name="hub" size={20} className="text-primary" />
-          <span className="absolute top-1 right-1 w-2 h-2 rounded-full bg-secondary" />
-        </div>
+        <AnimatedLogo size={40} />
         {expanded && (
           <>
             <div className="min-w-0 flex-1">

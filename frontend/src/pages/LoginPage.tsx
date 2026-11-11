@@ -2,6 +2,7 @@ import { Navigate, useNavigate } from "react-router-dom";
 import { useAuth } from "../auth/AuthContext";
 import { useLanguage } from "../i18n/LanguageContext";
 import { Icon } from "../icons";
+import AnimatedLogo from "../components/AnimatedLogo";
 
 export default function LoginPage() {
   const { isAuthenticated, signIn } = useAuth();
@@ -30,10 +31,7 @@ export default function LoginPage() {
       />
 
       <div className="relative w-full max-w-sm bg-surface-container-low rounded-2xl shadow-2xl p-space-xl flex flex-col items-center text-center gap-space-md">
-        <div className="w-16 h-16 rounded-2xl bg-surface-container-high flex items-center justify-center relative">
-          <Icon name="hub" size={32} className="text-primary" />
-          <span className="absolute top-1.5 right-1.5 w-2.5 h-2.5 rounded-full bg-secondary" />
-        </div>
+        <AnimatedLogo size={112} />
 
         <div>
           <h1 className="font-headline text-headline-lg text-on-surface">{t.auth.welcome}</h1>
