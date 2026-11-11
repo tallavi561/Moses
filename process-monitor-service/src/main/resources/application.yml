@@ -15,3 +15,6 @@ moses:
   prober:
     interval-ms: ${PROBE_INTERVAL_MS:15000}
     timeout-ms: ${PROBE_TIMEOUT_MS:5000}
+  liveness:
+    stale-after-seconds: ${STALE_AFTER_SECONDS:180}
+    check-interval-ms: ${STALE_CHECK_INTERVAL_MS:30000}

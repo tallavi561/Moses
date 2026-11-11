@@ -53,8 +53,9 @@ this base URL.
      them. MoSes draws an edge for each and creates a default connection object you (or
      the person using MoSes) can later annotate with protocol/description in the UI -
      you don't need to describe the connection further here.
-   - If a heartbeat stops arriving, the node's status in MoSes goes stale but is not
-     automatically marked down - prefer a short interval over a long one.
+   - Any log received for a `serviceName` also counts as proof of life. If neither a
+     heartbeat nor a log arrives for a few minutes (3 by default), MoSes marks the node
+     DOWN automatically - so a heartbeat every 15-60 seconds keeps a quiet service UP.
 
    Alternative to heartbeats: if the service already exposes a health-check endpoint
    (e.g. `GET /health`), you can instead register it once with a `probeUrl` and skip the

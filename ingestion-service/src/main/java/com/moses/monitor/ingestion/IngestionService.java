@@ -23,13 +23,16 @@ public class IngestionService {
     private final IngestionBuffer buffer;
     private final MongoTemplate mongoTemplate;
     private final ExecutorService ingestionExecutor;
+    private final ServiceLivenessTracker livenessTracker;
     private final int bucketGranularityMinutes;
 
     public IngestionService(Tokenizer tokenizer,
                              IngestionBuffer buffer,
                              MongoTemplate mongoTemplate,
                              ExecutorService ingestionExecutor,
+                             ServiceLivenessTracker livenessTracker,
                              @Value("${moses.index.bucket-granularity-minutes}") int bucketGranularityMinutes) {
+        this.livenessTracker = livenessTracker;
         this.tokenizer = tokenizer;
         this.buffer = buffer;
         this.mongoTemplate = mongoTemplate;
@@ -51,6 +54,7 @@ public class IngestionService {
     private void processAsync(LogEntry entry) {
         try {
             mongoTemplate.save(entry);
+            livenessTracker.touch(entry.getServiceName());
 
             List<String> words = tokenizer.tokenize(entry.getRawMessage());
             String bucketKey = BucketKeyUtil.bucketKey(entry.getTimestamp(), bucketGranularityMinutes);
