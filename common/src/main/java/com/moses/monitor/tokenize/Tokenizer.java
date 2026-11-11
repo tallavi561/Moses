@@ -17,7 +17,8 @@ import java.util.regex.Pattern;
  *    value is still fully searchable via the raw_message field on the
  *    Log Store collection.
  *  - Qualified names such as "java.lang.NullPointerException" are kept as a
- *    single token (split only on whitespace, then trim outer punctuation).
+ *    single token (split only on whitespace and JSON structure characters
+ *    {}[]", then trim outer punctuation).
  */
 @Component
 public class Tokenizer {
@@ -29,7 +30,10 @@ public class Tokenizer {
             "\\b\\d{4}-\\d{2}-\\d{2}T\\d{2}:\\d{2}:\\d{2}(?:\\.\\d+)?(?:Z|[+-]\\d{2}:\\d{2})?\\b");
     private static final Pattern LONG_NUMBER = Pattern.compile("\\b\\d{7,}\\b");
 
-    private static final Pattern WHITESPACE = Pattern.compile("\\s+");
+    // Whitespace plus JSON structure characters, so a structured payload like
+    // {"orderId":"ORDER-2"} yields the words orderid and order-2 instead of one opaque token.
+    // ':' is deliberately not a separator (keeps "host:port" style tokens intact).
+    private static final Pattern WHITESPACE = Pattern.compile("[\\s{}\\[\\]\",]+");
     private static final Pattern OUTER_PUNCTUATION = Pattern.compile("^[^\\w<>]+|[^\\w<>]+$");
 
     public List<String> tokenize(String rawMessage) {

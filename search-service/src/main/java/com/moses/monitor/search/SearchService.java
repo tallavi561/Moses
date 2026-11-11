@@ -27,6 +27,8 @@ import java.util.Set;
 @Service
 public class SearchService {
 
+    private static final int MAX_BROWSE_RESULTS = 1000;
+
     private final MongoTemplate mongoTemplate;
     private final Tokenizer tokenizer;
     private final int bucketGranularityMinutes;
@@ -41,8 +43,14 @@ public class SearchService {
 
     public List<LogEntry> search(SearchQuery query) {
         List<String> bucketKeys = BucketKeyUtil.bucketKeysInRange(query.getFrom(), query.getTo(), bucketGranularityMinutes);
-        if (bucketKeys.isEmpty() || query.getWords() == null || query.getWords().isEmpty()) {
+        if (bucketKeys.isEmpty()) {
             return List.of();
+        }
+
+        boolean noWords = query.getWords() == null || query.getWords().isEmpty();
+        if (noWords) {
+            // Service-only browse: no index lookup, just the service's logs in the time range.
+            return query.getServiceName() == null ? List.of() : fetchAndMicroFilter(null, query);
         }
 
         Set<String> candidateIds = null;
@@ -80,13 +88,25 @@ public class SearchService {
     }
 
     private List<LogEntry> fetchAndMicroFilter(Set<String> candidateIds, SearchQuery query) {
-        Criteria criteria = Criteria.where("_id").in(candidateIds)
-                .and("timestamp").gte(query.getFrom()).lte(query.getTo());
+        Criteria criteria = Criteria.where("timestamp").gte(query.getFrom()).lte(query.getTo());
+        if (candidateIds != null) {
+            criteria = criteria.and("_id").in(candidateIds);
+        }
         if (query.getLogLevel() != null) {
             criteria = criteria.and("log_level").is(query.getLogLevel());
         }
+        if (query.getServiceName() != null) {
+            criteria = criteria.and("service_name").is(query.getServiceName());
+        }
 
-        List<LogEntry> results = mongoTemplate.find(Query.query(criteria), LogEntry.class);
+        Query mongoQuery = Query.query(criteria);
+        if (candidateIds == null) {
+            // Newest N, re-sorted ascending below like every other result set.
+            mongoQuery.with(org.springframework.data.domain.Sort.by(
+                    org.springframework.data.domain.Sort.Direction.DESC, "timestamp"));
+            mongoQuery.limit(MAX_BROWSE_RESULTS);
+        }
+        List<LogEntry> results = mongoTemplate.find(mongoQuery, LogEntry.class);
         List<LogEntry> sorted = new ArrayList<>(results);
         sorted.sort(Comparator.comparing(LogEntry::getTimestamp));
         return sorted;

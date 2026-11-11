@@ -1,5 +1,5 @@
-import { useState } from "react";
-import { askAi, searchLogs, type LogEntry } from "../api";
+import { useEffect, useState } from "react";
+import { askAi, fetchProcessState, searchLogs, type LogEntry } from "../api";
 import { useLanguage, pluralize } from "../i18n/LanguageContext";
 import { Icon } from "../icons";
 
@@ -47,15 +47,23 @@ export default function SearchPage() {
     }
   });
   const [wordsInput, setWordsInput] = useState("");
+  const [serviceFilter, setServiceFilter] = useState("");
+  const [serviceNames, setServiceNames] = useState<string[]>([]);
   const [nlQuestion, setNlQuestion] = useState("");
   const [results, setResults] = useState<LogEntry[] | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
   const [lastMode, setLastMode] = useState<"structured" | "ai" | null>(null);
 
+  useEffect(() => {
+    fetchProcessState()
+      .then((nodes) => setServiceNames(nodes.map((n) => n.serviceName).sort()))
+      .catch(() => setServiceNames([]));
+  }, []);
+
   async function runStructuredSearch() {
     const words = wordsInput.split(/\s+/).filter(Boolean);
-    if (words.length === 0) {
+    if (words.length === 0 && !serviceFilter) {
       setError(t.search.needsWord);
       return;
     }
@@ -65,7 +73,7 @@ export default function SearchPage() {
     try {
       const to = new Date().toISOString();
       const from = new Date(Date.now() - 24 * 60 * 60 * 1000).toISOString();
-      const res = await searchLogs(words, from, to);
+      const res = await searchLogs(words, from, to, undefined, serviceFilter || undefined);
       setResults(res);
     } catch (e) {
       setError(`${t.search.errorPrefix}: ${(e as Error).message}`);
@@ -159,6 +167,19 @@ export default function SearchPage() {
                   className="w-full bg-surface-container-highest text-on-surface font-code text-code-md pl-9 pr-3 py-space-sm rounded-xl focus:outline-none focus:ring-1 focus:ring-secondary placeholder:text-on-surface-variant"
                 />
               </div>
+              <select
+                value={serviceFilter}
+                onChange={(e) => setServiceFilter(e.target.value)}
+                aria-label={t.search.serviceFilter}
+                className="shrink-0 max-w-[12rem] bg-surface-container-highest text-on-surface font-body-md text-body-md px-space-sm py-space-sm rounded-xl focus:outline-none focus:ring-1 focus:ring-secondary"
+              >
+                <option value="">{t.search.allServices}</option>
+                {serviceNames.map((name) => (
+                  <option key={name} value={name}>
+                    {name}
+                  </option>
+                ))}
+              </select>
               <button
                 className="shrink-0 flex items-center gap-1.5 px-space-md py-space-sm rounded-xl bg-primary-container hover:bg-inverse-primary text-on-primary-container font-headline text-headline-sm transition-all disabled:opacity-40"
                 onClick={runStructuredSearch}

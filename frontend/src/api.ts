@@ -49,10 +49,12 @@ export async function searchLogs(
   words: string[],
   from: string,
   to: string,
-  logLevel?: number
+  logLevel?: number,
+  service?: string
 ): Promise<LogEntry[]> {
   const params = new URLSearchParams();
   words.forEach((w) => params.append("words", w));
+  if (service) params.append("service", service);
   params.append("from", from);
   params.append("to", to);
   if (logLevel !== undefined) params.append("logLevel", String(logLevel));

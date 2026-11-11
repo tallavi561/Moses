@@ -9,12 +9,14 @@ public class SearchQuery {
     private final Instant from;
     private final Instant to;
     private final Integer logLevel;
+    private final String serviceName;
 
-    public SearchQuery(List<String> words, Instant from, Instant to, Integer logLevel) {
+    public SearchQuery(List<String> words, Instant from, Instant to, Integer logLevel, String serviceName) {
         this.words = words;
         this.from = from;
         this.to = to;
         this.logLevel = logLevel;
+        this.serviceName = serviceName == null || serviceName.isBlank() ? null : serviceName.trim();
     }
 
     public List<String> getWords() {
@@ -31,5 +33,10 @@ public class SearchQuery {
 
     public Integer getLogLevel() {
         return logLevel;
+    }
+
+    /** Exact service name to restrict results to, or null for all services. */
+    public String getServiceName() {
+        return serviceName;
     }
 }

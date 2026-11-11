@@ -32,7 +32,9 @@ export const strings = {
       loading: "Loading...",
       errorPrefix: "Search failed",
       aiErrorPrefix: "AI query failed",
-      needsWord: "Enter at least one search word",
+      needsWord: "Enter at least one search word or pick a service",
+      allServices: "All services",
+      serviceFilter: "Service",
       needsQuestion: "Enter a question",
       columns: {
         time: "Time",
@@ -158,7 +160,9 @@ export const strings = {
       loading: "טוען...",
       errorPrefix: "החיפוש נכשל",
       aiErrorPrefix: "שאילתת ה-AI נכשלה",
-      needsWord: "יש להזין לפחות מילת חיפוש אחת",
+      needsWord: "יש להזין לפחות מילת חיפוש אחת או לבחור שירות",
+      allServices: "כל השירותים",
+      serviceFilter: "שירות",
       needsQuestion: "יש להזין שאלה",
       columns: {
         time: "זמן",

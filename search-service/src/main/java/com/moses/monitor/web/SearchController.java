@@ -22,10 +22,11 @@ public class SearchController {
     }
 
     @GetMapping
-    public List<LogEntry> search(@RequestParam List<String> words,
+    public List<LogEntry> search(@RequestParam(required = false) List<String> words,
                                   @RequestParam Instant from,
                                   @RequestParam Instant to,
-                                  @RequestParam(required = false) Integer logLevel) {
-        return searchService.search(new SearchQuery(words, from, to, logLevel));
+                                  @RequestParam(required = false) Integer logLevel,
+                                  @RequestParam(required = false) String service) {
+        return searchService.search(new SearchQuery(words, from, to, logLevel, service));
     }
 }
