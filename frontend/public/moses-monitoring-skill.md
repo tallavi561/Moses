@@ -14,7 +14,7 @@ language.
 **Base URL** (the MoSes API gateway for this instance):
 
 ```
-https://api-gateway-5cnw.onrender.com
+https://api-gateway-x17f.onrender.com
 ```
 
 If the person running this told you a different URL, use that instead - this is just the
