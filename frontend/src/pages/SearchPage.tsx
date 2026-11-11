@@ -5,6 +5,7 @@ import { Icon } from "../icons";
 import { useServerLogs, type ServerQuery } from "../useServerLogs";
 import { LEVEL_CLASS, LEVEL_LABEL } from "../logLevels";
 import TraceView from "../components/TraceView";
+import InfoHint from "../components/InfoHint";
 
 const PAGE_SIZE = 20;
 const FEED_REFRESH_MS = 10000;
@@ -297,10 +298,14 @@ export default function SearchPage() {
   }
 
   function runStructuredSearch() {
-    const traceMatch = wordsInput.trim().match(/^trace:(\S+)$/i);
-    if (traceMatch) {
+    // A pasted trace id (UUID / long hex, or explicit "trace:<id>") opens the trace directly:
+    // ids are masked by the tokenizer, so they can never match as ordinary search words.
+    const input = wordsInput.trim();
+    const explicit = input.match(/^trace:(\S+)$/i);
+    const looksLikeTraceId = /^[0-9a-f]{8}(-[0-9a-f]{4}){3}-[0-9a-f]{12}$/i.test(input) || /^[0-9a-f-]{16,}$/i.test(input);
+    if (explicit || looksLikeTraceId) {
       setError(null);
-      openTrace(traceMatch[1]);
+      openTrace(explicit ? explicit[1] : input);
       return;
     }
     const words = wordsInput.split(/\s+/).filter(Boolean);
@@ -418,7 +423,18 @@ export default function SearchPage() {
       <div className="bg-surface-container-low rounded-2xl shadow-sm p-space-lg">
         {searchMode === "structured" ? (
           <>
-            <h2 className="font-headline text-headline-md text-on-surface">{t.search.structuredTitle}</h2>
+            <div className="flex items-center gap-space-xs">
+              <h2 className="font-headline text-headline-md text-on-surface">{t.search.structuredTitle}</h2>
+              <InfoHint title={t.search.helpTitle}>
+                <ul className="flex flex-col gap-space-xs list-disc ps-space-md text-on-surface-variant">
+                  <li>{t.search.helpWords}</li>
+                  <li>{t.search.helpService}</li>
+                  <li>{t.search.helpTrace}</li>
+                  <li>{t.search.helpIds}</li>
+                  <li>{t.search.helpWindow}</li>
+                </ul>
+              </InfoHint>
+            </div>
             <p className="font-body-sm text-body-sm text-on-surface-variant mt-space-xs mb-space-md">
               {t.search.structuredHint}
             </p>
@@ -462,7 +478,6 @@ export default function SearchPage() {
                 {t.search.searchButton}
               </button>
             </div>
-            <p className="font-body-sm text-body-sm text-on-surface-variant mt-space-xs">{t.search.traceHint}</p>
           </>
         ) : (
           <>
