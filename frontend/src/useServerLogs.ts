@@ -111,8 +111,12 @@ export function useServerLogs(query: ServerQuery | null) {
     if (key) void run("first");
   }, [key, run]);
 
+  const loadFirst = useCallback(() => {
+    setError(null);
+    void run("first");
+  }, [run]);
   const loadMore = useCallback(() => void run("more"), [run]);
   const refresh = useCallback(() => void run("refresh"), [run]);
 
-  return { ...data, loading, error, loadMore, refresh };
+  return { ...data, loading, error, loadFirst, loadMore, refresh };
 }

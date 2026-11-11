@@ -477,6 +477,27 @@ export default function SearchPage() {
         </div>
       )}
 
+      {showFeed && !feed.loaded && (
+        <div className="bg-surface-container-low rounded-2xl shadow-sm p-space-lg">
+          <h2 className="font-headline text-headline-md text-on-surface mb-space-sm">{t.search.recentTitle}</h2>
+          {feed.error ? (
+            <div className="flex items-center gap-space-sm flex-wrap font-body-md text-body-md text-error">
+              <Icon name="error" size={18} />
+              {t.search.errorPrefix}: {feed.error}
+              <button
+                type="button"
+                className="px-space-sm py-0.5 rounded-lg bg-surface-container-high text-on-surface hover:bg-surface-bright transition-colors"
+                onClick={feed.loadFirst}
+              >
+                {t.search.retry}
+              </button>
+            </div>
+          ) : (
+            spinner
+          )}
+        </div>
+      )}
+
       {showFeed && feed.loaded && (
         <div className="bg-surface-container-low rounded-2xl shadow-sm p-space-lg">
           <div className="flex items-center justify-between mb-space-sm">
