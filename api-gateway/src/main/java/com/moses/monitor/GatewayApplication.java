@@ -16,7 +16,10 @@ public class GatewayApplication {
     @Bean
     public RestTemplate restTemplate(RestTemplateBuilder builder) {
         // Don't throw on 4xx/5xx - the proxy must relay the real downstream status, not swallow it.
-        return builder.errorHandler(new org.springframework.web.client.DefaultResponseErrorHandler() {
+        return builder
+                .setConnectTimeout(java.time.Duration.ofSeconds(10))
+                .setReadTimeout(java.time.Duration.ofSeconds(100))
+                .errorHandler(new org.springframework.web.client.DefaultResponseErrorHandler() {
             @Override
             public void handleError(org.springframework.http.client.ClientHttpResponse response) {
                 // no-op: let the proxy controller inspect the raw response itself
