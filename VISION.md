@@ -28,8 +28,8 @@ one of them in isolation.
 |---|---|---|
 | **Logs** | Free-text events a service emits (errors, request lines, state changes) | **Built** - custom inverted-index search, `POST /api/logs` |
 | **Topology & health** | Which services exist, how they connect, are they up | **Built** - Node/Connection model, heartbeats, URL prober |
-| **Distributed tracing** | Which services a single request passed through, and how long each hop took | **Planned** - see §4 |
-| **Resource usage** | CPU/RAM/disk per service over time | **Not started** - would piggyback on the heartbeat channel (`cpuPercent`/`memoryMb` fields already exist on the Node model but nothing populates them yet) |
+| **Distributed tracing** | Which services a single request passed through, and how long each hop took | **Partly built** - `traceId`/`spanId` on logs (indexed), `GET /api/search/trace/{id}`, waterfall trace view in Search (click "View full trace" on a log or type `trace:<id>`), SKILL tells the AI to propagate `X-Trace-Id`/`X-Parent-Span-Id`. No span tree/parent links or hop durations yet - see §4 |
+| **Resource usage** | CPU/RAM/disk per service over time | **Latest values built** - SKILL asks every heartbeat to carry `cpuPercent`/`memoryMb`; Architecture shows them per node (stale values dimmed). No history/charts, no disk yet |
 | **Network-level observability** | Raw traffic volume and (optionally) message content between services, captured without the service's cooperation | **Long-term, infra-dependent** - see §5 |
 | **Code/repo understanding** | AI reads a connected repo to infer/propose the topology above, rather than requiring it to be declared | **Planned**, discussed earlier as the "Repo+AI flow discovery" phase, not started |
 

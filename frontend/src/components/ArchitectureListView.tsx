@@ -3,6 +3,7 @@ import type { Connection, ProcessState } from "../api";
 import { useLanguage } from "../i18n/LanguageContext";
 import { Icon } from "../icons";
 import { probeStatusLabel } from "../probeStatus";
+import NodeMetrics from "./NodeMetrics";
 
 interface ArchitectureListViewProps {
   states: ProcessState[];
@@ -71,6 +72,7 @@ export default function ArchitectureListView({ states, connections, onEditNode, 
                       <p className="font-body-md text-body-md text-on-surface-variant">
                         {node.description || t.flow.listNoDescription}
                       </p>
+                      <NodeMetrics state={node} />
                       {probeStatusLabel(node, t) && (
                         <p className="flex items-center gap-1 font-code text-code-sm text-on-surface-variant bg-surface-container-high rounded-lg px-space-sm py-1.5 w-fit">
                           <Icon name="podcasts" size={14} className="text-secondary" />

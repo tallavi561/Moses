@@ -5,6 +5,7 @@ import com.moses.monitor.search.LogPage;
 import com.moses.monitor.search.SearchQuery;
 import com.moses.monitor.search.SearchService;
 import org.springframework.web.bind.annotation.GetMapping;
+import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
@@ -29,6 +30,12 @@ public class SearchController {
                                   @RequestParam(required = false) Integer logLevel,
                                   @RequestParam(required = false) String service) {
         return searchService.search(new SearchQuery(words, from, to, logLevel, service));
+    }
+
+    /** Everything that happened for one request (traceId), across services, oldest first. */
+    @GetMapping("/trace/{traceId}")
+    public List<LogEntry> trace(@PathVariable String traceId) {
+        return searchService.trace(traceId);
     }
 
     @GetMapping("/page")

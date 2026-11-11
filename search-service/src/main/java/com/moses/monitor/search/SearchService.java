@@ -37,6 +37,7 @@ public class SearchService {
     private static final Logger log = LoggerFactory.getLogger(SearchService.class);
 
     private static final int MAX_BROWSE_RESULTS = 1000;
+    private static final int MAX_TRACE_LOGS = 1000;
 
     private final MongoTemplate mongoTemplate;
     private final Tokenizer tokenizer;
@@ -139,6 +140,9 @@ public class SearchService {
         if (query.getServiceName() != null) {
             conditions.add(Criteria.where("service_name").is(query.getServiceName()));
         }
+        if (query.getTraceId() != null) {
+            conditions.add(Criteria.where("trace_id").is(query.getTraceId()));
+        }
         if (before != null) {
             Criteria older = Criteria.where("timestamp").lt(before);
             conditions.add(beforeId == null
@@ -160,6 +164,22 @@ public class SearchService {
         log.info("fetch phase: {} log(s) in {} ms", fetched.size(), (System.nanoTime() - fetchStart) / 1_000_000);
         boolean hasMore = fetched.size() > limit;
         return new LogPage(hasMore ? fetched.subList(0, limit) : fetched, hasMore);
+    }
+
+    /**
+     * Every log of one trace, oldest first, across all services and without a time window
+     * (a trace is identified by its id alone; retention bounds how far back it can reach).
+     */
+    public List<LogEntry> trace(String traceId) {
+        Query query = new Query(Criteria.where("trace_id").is(traceId))
+                .with(org.springframework.data.domain.Sort.by(
+                        org.springframework.data.domain.Sort.Order.asc("timestamp"),
+                        org.springframework.data.domain.Sort.Order.asc("_id")))
+                .limit(MAX_TRACE_LOGS);
+        long start = System.nanoTime();
+        List<LogEntry> logs = mongoTemplate.find(query, LogEntry.class);
+        log.info("trace lookup: {} log(s) in {} ms", logs.size(), (System.nanoTime() - start) / 1_000_000);
+        return logs;
     }
 
     private String normalize(String rawWord) {
@@ -189,6 +209,9 @@ public class SearchService {
         }
         if (query.getServiceName() != null) {
             criteria = criteria.and("service_name").is(query.getServiceName());
+        }
+        if (query.getTraceId() != null) {
+            criteria = criteria.and("trace_id").is(query.getTraceId());
         }
 
         Query mongoQuery = Query.query(criteria);

@@ -10,13 +10,25 @@ public class SearchQuery {
     private final Instant to;
     private final Integer logLevel;
     private final String serviceName;
+    private final String traceId;
 
     public SearchQuery(List<String> words, Instant from, Instant to, Integer logLevel, String serviceName) {
+        this(words, from, to, logLevel, serviceName, null);
+    }
+
+    public SearchQuery(List<String> words, Instant from, Instant to, Integer logLevel, String serviceName,
+                       String traceId) {
         this.words = words;
         this.from = from;
         this.to = to;
         this.logLevel = logLevel;
         this.serviceName = serviceName == null || serviceName.isBlank() ? null : serviceName.trim();
+        this.traceId = traceId == null || traceId.isBlank() ? null : traceId.trim();
+    }
+
+    /** Exact traceId to restrict results to, or null. */
+    public String getTraceId() {
+        return traceId;
     }
 
     public List<String> getWords() {

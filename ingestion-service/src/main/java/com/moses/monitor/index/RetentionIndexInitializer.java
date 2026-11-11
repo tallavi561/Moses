@@ -45,6 +45,15 @@ public class RetentionIndexInitializer {
         ensureTtlIndex(LogEntry.class, LOGS_TTL_INDEX, "timestamp", ttl);
         ensureTtlIndex(IndexBucket.class, BUCKETS_TTL_INDEX, "bucket_start", ttl);
         log.info("Retention TTL indexes ensured ({} days)", retentionDays);
+        ensureTraceIdIndex();
+    }
+
+    /** Lets "everything for this traceId" be an index lookup instead of a collection scan. */
+    private void ensureTraceIdIndex() {
+        mongoTemplate.indexOps(LogEntry.class).ensureIndex(
+                new Index().on("trace_id", org.springframework.data.domain.Sort.Direction.ASC)
+                        .sparse()
+                        .named("idx_logs_trace_id"));
     }
 
     private void ensureTtlIndex(Class<?> entityClass, String indexName, String field, Duration ttl) {

@@ -71,8 +71,9 @@ public class ProcessStateController {
         updated.setProcessName(request.getProcessName());
         updated.setDescription(request.getDescription());
         updated.setStatus(request.getStatus());
-        updated.setCpuPercent(request.getCpuPercent());
-        updated.setMemoryMb(request.getMemoryMb());
+        // The edit form doesn't carry metrics; keep what the service last reported.
+        updated.setCpuPercent(request.getCpuPercent() != null ? request.getCpuPercent() : existing.getCpuPercent());
+        updated.setMemoryMb(request.getMemoryMb() != null ? request.getMemoryMb() : existing.getMemoryMb());
         updated.setProbeUrl(request.getProbeUrl());
         updated.setLastSeen(existing.getLastSeen());
         carryOverProbeTelemetry(existing, updated);

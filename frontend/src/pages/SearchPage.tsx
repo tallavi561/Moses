@@ -3,27 +3,26 @@ import { askAi, fetchProcessState, type LogEntry } from "../api";
 import { useLanguage, pluralize } from "../i18n/LanguageContext";
 import { Icon } from "../icons";
 import { useServerLogs, type ServerQuery } from "../useServerLogs";
+import { LEVEL_CLASS, LEVEL_LABEL } from "../logLevels";
+import TraceView from "../components/TraceView";
 
 const PAGE_SIZE = 20;
 const FEED_REFRESH_MS = 10000;
 
-const LEVEL_LABEL: Record<number, string> = {
-  0: "TRACE",
-  1: "DEBUG",
-  2: "INFO",
-  3: "WARN",
-  4: "ERROR",
-  5: "FATAL",
-};
-
-const LEVEL_CLASS: Record<number, string> = {
-  0: "bg-surface-container-high text-on-surface-variant",
-  1: "bg-surface-container-high text-on-surface-variant",
-  2: "bg-secondary-container/20 text-secondary",
-  3: "bg-tertiary-container/20 text-tertiary",
-  4: "bg-primary-container/20 text-primary",
-  5: "bg-primary-container text-on-primary-container",
-};
+function TraceChip({ traceId, onTrace }: { traceId: string; onTrace: (traceId: string) => void }) {
+  const { t } = useLanguage();
+  return (
+    <button
+      type="button"
+      title={traceId}
+      className="flex items-center gap-1 w-fit px-space-sm py-0.5 rounded-full bg-secondary-container/20 text-secondary font-code text-code-sm hover:bg-secondary-container/40 transition-colors"
+      onClick={() => onTrace(traceId)}
+    >
+      <Icon name="account_tree" size={13} />
+      {t.search.traceOpen}
+    </button>
+  );
+}
 
 function LevelBadge({ level }: { level: number }) {
   return (
@@ -67,22 +66,29 @@ function parseLogToJson(log: LogEntry): Record<string, unknown> {
   return base;
 }
 
-function LogJsonList({ logs }: { logs: LogEntry[] }) {
+function LogJsonList({ logs, onTrace }: { logs: LogEntry[]; onTrace: (traceId: string) => void }) {
   return (
     <div className="flex flex-col gap-space-xs">
       {logs.map((log) => (
-        <pre
+        <div
           key={log.logId}
-          className="font-code text-code-sm text-on-surface bg-surface-container rounded-xl px-space-md py-space-sm overflow-x-auto whitespace-pre-wrap break-words cursor-default transition-all duration-200 ease-out hover:bg-surface-container-high hover:shadow-md hover:translate-x-0.5"
+          className="bg-surface-container rounded-xl px-space-md py-space-sm cursor-default transition-all duration-200 ease-out hover:bg-surface-container-high hover:shadow-md hover:translate-x-0.5"
         >
-          {JSON.stringify(parseLogToJson(log), null, 2)}
-        </pre>
+          <pre className="font-code text-code-sm text-on-surface overflow-x-auto whitespace-pre-wrap break-words">
+            {JSON.stringify(parseLogToJson(log), null, 2)}
+          </pre>
+          {log.traceId && (
+            <div className="mt-space-xs">
+              <TraceChip traceId={log.traceId} onTrace={onTrace} />
+            </div>
+          )}
+        </div>
       ))}
     </div>
   );
 }
 
-function LogTable({ logs }: { logs: LogEntry[] }) {
+function LogTable({ logs, onTrace }: { logs: LogEntry[]; onTrace: (traceId: string) => void }) {
   const { t, lang } = useLanguage();
   return (
     <div className="overflow-x-auto rounded-xl">
@@ -113,7 +119,14 @@ function LogTable({ logs }: { logs: LogEntry[] }) {
               <td className="font-code text-code-sm text-on-surface-variant px-space-sm py-space-xs whitespace-nowrap">
                 {log.ip}
               </td>
-              <td className="font-code text-code-sm text-on-surface px-space-sm py-space-xs">{log.rawMessage}</td>
+              <td className="font-code text-code-sm text-on-surface px-space-sm py-space-xs">
+                {log.rawMessage}
+                {log.traceId && (
+                  <div className="mt-1">
+                    <TraceChip traceId={log.traceId} onTrace={onTrace} />
+                  </div>
+                )}
+              </td>
             </tr>
           ))}
         </tbody>
@@ -145,6 +158,7 @@ interface PagedLogListProps {
   /** Page goes back to 1 whenever this changes (a new query). */
   resetKey: string;
   view: "json" | "table";
+  onTrace: (traceId: string) => void;
   onRefresh?: () => void;
 }
 
@@ -153,7 +167,7 @@ interface PagedLogListProps {
  * loaded pages makes no request; when the viewed page gets within one page of the end of the
  * cache, the next chunk is fetched in the background so the following page is ready.
  */
-function PagedLogList({ logs, hasMore, loading, loadMore, resetKey, view, onRefresh }: PagedLogListProps) {
+function PagedLogList({ logs, hasMore, loading, loadMore, resetKey, view, onTrace, onRefresh }: PagedLogListProps) {
   const [page, setPage] = useState(0);
 
   useEffect(() => setPage(0), [resetKey]);
@@ -180,7 +194,11 @@ function PagedLogList({ logs, hasMore, loading, loadMore, resetKey, view, onRefr
 
   return (
     <>
-      {view === "json" ? <LogJsonList logs={pageLogs} /> : <LogTable logs={pageLogs} />}
+      {view === "json" ? (
+        <LogJsonList logs={pageLogs} onTrace={onTrace} />
+      ) : (
+        <LogTable logs={pageLogs} onTrace={onTrace} />
+      )}
 
       {showPager && (
         <div className="flex items-center justify-center gap-1 mt-space-md flex-wrap">
@@ -262,6 +280,7 @@ export default function SearchPage() {
   const [error, setError] = useState<string | null>(null);
   const [lastMode, setLastMode] = useState<"structured" | "ai" | null>(null);
   const [resultsView, setResultsView] = useState<"json" | "table">("json");
+  const [traceId, setTraceId] = useState<string | null>(null);
 
   const feed = useServerLogs(FEED_QUERY);
   const search = useServerLogs(structuredQuery);
@@ -272,7 +291,18 @@ export default function SearchPage() {
       .catch(() => setServiceNames([]));
   }, []);
 
+  function openTrace(id: string) {
+    setTraceId(id);
+    window.scrollTo({ top: 0, behavior: "smooth" });
+  }
+
   function runStructuredSearch() {
+    const traceMatch = wordsInput.trim().match(/^trace:(\S+)$/i);
+    if (traceMatch) {
+      setError(null);
+      openTrace(traceMatch[1]);
+      return;
+    }
     const words = wordsInput.split(/\s+/).filter(Boolean);
     if (words.length === 0 && !serviceFilter) {
       setError(t.search.needsWord);
@@ -432,6 +462,7 @@ export default function SearchPage() {
                 {t.search.searchButton}
               </button>
             </div>
+            <p className="font-body-sm text-body-sm text-on-surface-variant mt-space-xs">{t.search.traceHint}</p>
           </>
         ) : (
           <>
@@ -477,6 +508,8 @@ export default function SearchPage() {
         </div>
       )}
 
+      {traceId && <TraceView traceId={traceId} onClose={() => setTraceId(null)} />}
+
       {showFeed && !feed.loaded && (
         <div className="bg-surface-container-low rounded-2xl shadow-sm p-space-lg">
           <h2 className="font-headline text-headline-md text-on-surface mb-space-sm">{t.search.recentTitle}</h2>
@@ -517,6 +550,7 @@ export default function SearchPage() {
               loadMore={feed.loadMore}
               resetKey="feed"
               view="json"
+              onTrace={openTrace}
               onRefresh={feed.refresh}
             />
           )}
@@ -554,6 +588,7 @@ export default function SearchPage() {
                     loadMore={() => undefined}
                     resetKey={`ai-${nlQuestion}`}
                     view={resultsView}
+                    onTrace={openTrace}
                   />
                 )
                 : (
@@ -564,6 +599,7 @@ export default function SearchPage() {
                     loadMore={search.loadMore}
                     resetKey={JSON.stringify(structuredQuery)}
                     view={resultsView}
+                    onTrace={openTrace}
                   />
                 )}
         </div>

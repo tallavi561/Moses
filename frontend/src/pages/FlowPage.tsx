@@ -28,6 +28,7 @@ import AddServiceForm from "../components/AddServiceForm";
 import EditNodeForm from "../components/EditNodeForm";
 import EditConnectionForm from "../components/EditConnectionForm";
 import ArchitectureListView from "../components/ArchitectureListView";
+import NodeMetrics from "../components/NodeMetrics";
 import { Icon } from "../icons";
 import { probeStatusLabel } from "../probeStatus";
 
@@ -102,6 +103,8 @@ function FlowNodeCard({ state, t }: { state: ProcessState; t: ReturnType<typeof 
           <span className="truncate">{probe}</span>
         </div>
       )}
+      <NodeMetrics state={state} compact />
+
     </div>
   );
 }

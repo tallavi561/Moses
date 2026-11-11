@@ -95,6 +95,13 @@ export async function searchLogPage(p: LogPageParams): Promise<LogPage> {
   return res.json();
 }
 
+/** Every log of one trace across services, oldest first. */
+export async function fetchTrace(traceId: string): Promise<LogEntry[]> {
+  const res = await fetch(`${API_BASE_URL}/api/search/trace/${encodeURIComponent(traceId)}`);
+  if (!res.ok) throw new Error(`Trace lookup failed: ${res.status}`);
+  return res.json();
+}
+
 export async function fetchProcessState(): Promise<ProcessState[]> {
   const res = await fetch(`${API_BASE_URL}/api/process/state`);
   if (!res.ok) throw new Error(`Process state fetch failed: ${res.status}`);

@@ -2,6 +2,7 @@ package com.moses.monitor.process;
 
 import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.NotNull;
+import jakarta.validation.constraints.PositiveOrZero;
 
 import java.util.List;
 
@@ -16,7 +17,12 @@ public class HeartbeatRequest {
     @NotNull
     private ProcessStatus status;
 
+    /** Process CPU use in percent of one core (may exceed 100 on multi-core). Optional. */
+    @PositiveOrZero
     private Double cpuPercent;
+
+    /** Resident memory of the process in MB. Optional. */
+    @PositiveOrZero
     private Double memoryMb;
     private String probeUrl;
 
