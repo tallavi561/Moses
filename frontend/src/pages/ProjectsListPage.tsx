@@ -4,7 +4,7 @@ import { useProjects } from "../projects/ProjectsContext";
 import { useLanguage } from "../i18n/LanguageContext";
 import { useAuth } from "../auth/AuthContext";
 import { Icon } from "../icons";
-import AnimatedLogo from "../components/AnimatedLogo";
+import HeroLogo from "../components/HeroLogo";
 
 export default function ProjectsListPage() {
   const { projects, selectProject, createProject } = useProjects();
@@ -29,9 +29,9 @@ export default function ProjectsListPage() {
   return (
     <div className="min-h-screen w-full bg-background px-space-md py-space-xl">
       <div className="max-w-3xl mx-auto flex flex-col gap-space-lg">
+        <HeroLogo compact />
         <header className="flex items-center justify-between gap-space-md">
           <div className="flex items-center gap-space-sm">
-            <AnimatedLogo size={48} />
             <div>
               <h1 className="font-headline text-headline-lg text-on-surface">{t.appName}</h1>
               <p className="font-body-md text-body-md text-on-surface-variant">{t.projects.subtitle}</p>

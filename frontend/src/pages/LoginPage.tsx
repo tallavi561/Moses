@@ -2,7 +2,7 @@ import { Navigate, useNavigate } from "react-router-dom";
 import { useAuth } from "../auth/AuthContext";
 import { useLanguage } from "../i18n/LanguageContext";
 import { Icon } from "../icons";
-import AnimatedLogo from "../components/AnimatedLogo";
+import HeroLogo from "../components/HeroLogo";
 
 export default function LoginPage() {
   const { isAuthenticated, signIn } = useAuth();
@@ -30,9 +30,10 @@ export default function LoginPage() {
         }}
       />
 
-      <div className="relative w-full max-w-sm bg-surface-container-low rounded-2xl shadow-2xl p-space-xl flex flex-col items-center text-center gap-space-md">
-        <AnimatedLogo size={112} />
+      <div className="relative w-full flex flex-col items-center gap-space-md py-space-md">
+        <HeroLogo />
 
+        <div className="w-full max-w-sm bg-surface-container-low rounded-2xl shadow-2xl p-space-xl flex flex-col items-center text-center gap-space-md">
         <div>
           <h1 className="font-headline text-headline-lg text-on-surface">{t.auth.welcome}</h1>
           <p className="font-body-md text-body-md text-on-surface-variant mt-space-xs">{t.auth.subtitle}</p>
@@ -48,6 +49,7 @@ export default function LoginPage() {
         </button>
 
         <p className="font-code text-code-sm text-on-surface-variant leading-relaxed">{t.auth.mockNotice}</p>
+        </div>
       </div>
     </div>
   );
