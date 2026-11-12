@@ -1,16 +1,17 @@
 """
 Builds the idle loop that continues the intro logo video (see make-hero-video.py):
 
-  frontend/src/assets/hero-loop.mp4   LOOP_SECONDS of very subtle motion, seamless when repeated
+  frontend/src/assets/hero-loop.mp4   LOOP_SECONDS of gentle motion, seamless when repeated
 
 It starts from the EXACT last frame of hero-logo.mp4, so the hand-off from the intro is invisible,
-and every effect is zero at t=0 and t=T, so the last frame of the loop equals its first and
-repeating it never jumps. Nothing here is AI-generated video: the motion is computed from that
-one frame:
+and every effect is exactly zero at t=0 and t=T, so the last frame of the loop equals its first and
+repeating it never jumps. Nothing here is AI-generated video: the motion is computed from that one
+frame:
 
-  - glow pulse   the cyan, light-emitting parts brighten and bloom slightly, then settle
-  - light sweep  one soft diagonal band of light travels across those same parts
-  - breathing    the whole image scales up by well under 1% and back
+  - currents     pulses of light leave the eagle's body and flow outward along the cyan lines of
+                 the wings and circuits (a few per loop, each fading in and out on its way)
+  - wing flap    the wings flex up and slightly inward and settle back (the body stays put)
+  - glow pulse   the light-emitting parts swell a little and bloom, then settle
   - particles    a few faint dots drift upward and fade in and out
 
 Tune the constants below. Requires: pip install imageio-ffmpeg pillow numpy scipy
@@ -31,17 +32,28 @@ INTRO = ASSETS / "hero-logo.mp4"
 OUT = ASSETS / "hero-loop.mp4"
 
 FPS = 24
-LOOP_SECONDS = 8
+LOOP_SECONDS = 10
 FRAMES = FPS * LOOP_SECONDS
 
-GLOW_GAIN = 0.10       # brighten glowing pixels by up to this much at the peak of the pulse
-BLOOM_GAIN = 0.20      # how much of the blurred glow is added back (soft halo)
-SWEEP_GAIN = 0.28      # extra brightness on glowing pixels under the travelling band
-SWEEP_WIDTH = 0.07     # band half-width as a fraction of the image diagonal
-BREATH = 0.006         # peak scale-up of the whole image (0.6%)
-PARTICLES = 34
-PARTICLE_DRIFT_PX = 46  # how far a particle floats upward over one loop
-PARTICLE_GAIN = 0.45
+# currents: pulses launched from the body, travelling outward along the lit lines
+PULSE_LAUNCHES = (0.04, 0.27, 0.50)   # launch times as a fraction of the loop
+PULSE_TRAVEL = 0.42                    # fraction of the loop one pulse takes to reach the wing tips
+PULSE_WIDTH_PX = 62                    # thickness of the travelling band
+PULSE_GAIN = 1.0                       # brightness added on lit pixels under the band (x original)
+PULSE_WARP_PX = 34                     # irregular wavefront so it isn't a perfect circle
+
+# wing flap
+FLAPS = 2                              # up-and-down cycles per loop
+FLAP_UP_PX = 11                        # how far the wing tips rise at the top of a flap
+FLAP_IN_PX = 5                         # and how far they pull toward the body
+BODY_HALF_WIDTH_PX = 80                # inside this the eagle's body does not move at all
+
+# glow + particles
+GLOW_GAIN = 0.12
+BLOOM_GAIN = 0.22
+PARTICLES = 40
+PARTICLE_DRIFT_PX = 52
+PARTICLE_GAIN = 0.5
 
 rng = np.random.default_rng(7)
 ffmpeg = imageio_ffmpeg.get_ffmpeg_exe()
@@ -65,8 +77,22 @@ glow_mask = ndimage.gaussian_filter(glow_mask, 1.0)[..., None]
 bloom = ndimage.gaussian_filter(base * glow_mask, sigma=(6, 6, 0))
 
 yy, xx = np.mgrid[0:H, 0:W].astype(np.float32)
-theta = np.deg2rad(28)
-u = (xx * np.cos(theta) + yy * np.sin(theta)) / (W * np.cos(theta) + H * np.sin(theta))  # 0..1 across
+cx, cy = W * 0.5, H * 0.50                                     # the eagle's chest
+
+# distance from the chest, bent by a smooth static noise so wavefronts look organic
+noise = ndimage.gaussian_filter(rng.standard_normal((H, W)).astype(np.float32), 38)
+noise /= np.abs(noise).max()
+dist = np.sqrt((xx - cx) ** 2 + (yy - cy) ** 2) + PULSE_WARP_PX * noise
+R_MAX = float(np.sqrt((W / 2) ** 2 + (H / 2) ** 2))
+
+# wing weights: 0 on the body, growing toward the tips; limited to the band where the wings are
+side = np.sign(xx - cx)
+across = np.clip((np.abs(xx - cx) - BODY_HALF_WIDTH_PX) / (W / 2 - BODY_HALF_WIDTH_PX), 0, 1)
+across = across * across * (3 - 2 * across)                    # smoothstep
+across = across ** 1.3
+top = np.clip((yy - 10) / 50, 0, 1)
+bottom = np.clip((H * 0.74 - yy) / 120, 0, 1)
+wing_weight = (across * top * bottom * (top * (3 - 2 * top))).astype(np.float32)
 
 # particles live in the central area where the art is; each gets its own phase/size/speed
 px = rng.uniform(0.12 * W, 0.88 * W, PARTICLES)
@@ -79,61 +105,82 @@ p_flicker_k = rng.integers(1, 4, PARTICLES)            # integer -> periodic ove
 PARTICLE_COLOR = np.array([130, 225, 255], np.float32)
 
 
-def smooth_env(t):  # 0 at t=0 and t=1, peak in the middle: keeps first == last frame
-    return 0.5 * (1 - np.cos(2 * np.pi * t))
+def swell(t, cycles=1):
+    """0 at t=0 and t=1, peaks in between: 0.5*(1-cos). Keeps the first frame == the last."""
+    return 0.5 * (1 - np.cos(2 * np.pi * cycles * t))
+
+
+def pulse_amplitude(t, launch):
+    """0 before launch and after the pulse has left the picture, smooth in between."""
+    k = (t - launch) / PULSE_TRAVEL
+    if k <= 0 or k >= 1:
+        return 0.0, 0.0
+    return float(np.sin(np.pi * k) ** 0.8), k
+
+
+def warp_wings(frame, t):
+    s = swell(t, FLAPS)
+    if s <= 1e-4:
+        return frame
+    dy = -FLAP_UP_PX * s * wing_weight                       # up
+    dx = -side * FLAP_IN_PX * s * wing_weight                # toward the body
+    coords = [yy - dy, xx - dx]                              # backward map: where each pixel comes from
+    out = np.empty_like(frame)
+    for ch in range(3):
+        out[..., ch] = ndimage.map_coordinates(frame[..., ch], coords, order=3, mode="nearest")
+    return out
 
 
 def render(t):
     """Frame for loop position t in [0, 1)."""
-    env = smooth_env(t)
+    env = swell(t)
     frame = base * (1 + GLOW_GAIN * env * glow_mask) + bloom * (BLOOM_GAIN * env)
 
-    centre = -0.25 + 1.5 * t                              # band is off-image at t=0 and t=1
-    band = np.exp(-(((u - centre) / SWEEP_WIDTH) ** 2))[..., None]
-    frame += base * glow_mask * band * SWEEP_GAIN
+    for launch in PULSE_LAUNCHES:                            # currents flowing out of the body
+        amp, k = pulse_amplitude(t, launch)
+        if amp == 0.0:
+            continue
+        front = k * (R_MAX * 1.15) - PULSE_WIDTH_PX * 0.5    # band starts inside, ends past the tips
+        band = np.exp(-(((dist - front) / PULSE_WIDTH_PX) ** 2))[..., None]
+        frame += base * glow_mask * band * (PULSE_GAIN * amp)
 
     for i in range(PARTICLES):
-        life = (t + p_phase[i]) % 1.0                     # each dot floats up once per loop
+        life = (t + p_phase[i]) % 1.0                        # each dot floats up once per loop
         fade = np.sin(np.pi * life) ** 2
         flicker = 0.75 + 0.25 * np.sin(2 * np.pi * (p_flicker_k[i] * t) + p_phase[i] * 6.28)
         amp = PARTICLE_GAIN * p_amp[i] * fade * flicker * env
         if amp < 0.01:
             continue
-        cx = px[i] + p_sway[i] * np.sin(2 * np.pi * (t + p_phase[i]))
-        cy = py[i] - PARTICLE_DRIFT_PX * life
-        x0, x1 = int(max(cx - 8, 0)), int(min(cx + 9, W))
-        y0, y1 = int(max(cy - 8, 0)), int(min(cy + 9, H))
+        pcx = px[i] + p_sway[i] * np.sin(2 * np.pi * (t + p_phase[i]))
+        pcy = py[i] - PARTICLE_DRIFT_PX * life
+        x0, x1 = int(max(pcx - 8, 0)), int(min(pcx + 9, W))
+        y0, y1 = int(max(pcy - 8, 0)), int(min(pcy + 9, H))
         if x0 >= x1 or y0 >= y1:
             continue
-        d2 = (xx[y0:y1, x0:x1] - cx) ** 2 + (yy[y0:y1, x0:x1] - cy) ** 2
+        d2 = (xx[y0:y1, x0:x1] - pcx) ** 2 + (yy[y0:y1, x0:x1] - pcy) ** 2
         blob = np.exp(-d2 / (2 * p_size[i] ** 2))[..., None]
         frame[y0:y1, x0:x1] += blob * PARTICLE_COLOR * amp
 
     frame = np.clip(frame, 0, 255)
-    s = 1 + BREATH * env                                  # breathing, about the image centre
-    if s > 1.00001:
-        cx_, cy_ = W / 2, H / 2
-        coeffs = (1 / s, 0, cx_ - cx_ / s, 0, 1 / s, cy_ - cy_ / s)
-        img = Image.fromarray(frame.astype(np.uint8)).transform((W, H), Image.AFFINE, coeffs, Image.BICUBIC)
-        return np.array(img)
-    return frame.astype(np.uint8)
+    frame = warp_wings(frame, t)                             # the lit parts flex with the wings
+    return np.clip(frame, 0, 255).astype(np.uint8)
 
 
-# --- encode ----------------------------------------------------------------------------------
-proc = subprocess.Popen(
-    [ffmpeg, "-hide_banner", "-loglevel", "error", "-y",
-     "-f", "rawvideo", "-pix_fmt", "rgb24", "-s", f"{W}x{H}", "-r", str(FPS), "-i", "-",
-     "-an", "-c:v", "libx264", "-preset", "slow", "-crf", "23", "-pix_fmt", "yuv420p",
-     "-movflags", "+faststart", str(OUT)],
-    stdin=subprocess.PIPE,
-)
-diffs = []
-for n in range(FRAMES):
-    frame = render(n / FRAMES)
-    diffs.append(float(np.abs(frame.astype(np.float32) - base).mean()))
-    proc.stdin.write(frame.tobytes())
-proc.stdin.close()
-proc.wait()
-print("wrote", OUT.name, round(OUT.stat().st_size / 1024), "KB,", FRAMES, "frames,", LOOP_SECONDS, "s")
-print("mean abs change vs the base frame: first %.3f, peak %.2f, last %.3f (gray levels 0-255)"
-      % (diffs[0], max(diffs), diffs[-1]))
+if __name__ == "__main__":
+    proc = subprocess.Popen(
+        [ffmpeg, "-hide_banner", "-loglevel", "error", "-y",
+         "-f", "rawvideo", "-pix_fmt", "rgb24", "-s", f"{W}x{H}", "-r", str(FPS), "-i", "-",
+         "-an", "-c:v", "libx264", "-preset", "slow", "-crf", "23", "-pix_fmt", "yuv420p",
+         "-movflags", "+faststart", str(OUT)],
+        stdin=subprocess.PIPE,
+    )
+    diffs = []
+    for n in range(FRAMES):
+        frame = render(n / FRAMES)
+        diffs.append(float(np.abs(frame.astype(np.float32) - base).mean()))
+        proc.stdin.write(frame.tobytes())
+    proc.stdin.close()
+    proc.wait()
+    print("wrote", OUT.name, round(OUT.stat().st_size / 1024), "KB,", FRAMES, "frames,", LOOP_SECONDS, "s")
+    print("mean abs change vs the base frame: first %.3f, peak %.2f, last %.3f (gray levels 0-255)"
+          % (diffs[0], max(diffs), diffs[-1]))
