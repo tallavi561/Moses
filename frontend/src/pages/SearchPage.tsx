@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import { askAi, fetchProcessState, type LogEntry } from "../api";
+import { askAi, fetchProcessState, type AiInterpretation, type LogEntry } from "../api";
 import { useLanguage, pluralize } from "../i18n/LanguageContext";
 import { Icon } from "../icons";
 import { useServerLogs, type ServerQuery } from "../useServerLogs";
@@ -9,6 +9,43 @@ import InfoHint from "../components/InfoHint";
 
 const PAGE_SIZE = 20;
 const FEED_REFRESH_MS = 10000;
+
+/** How the AI understood the question: chips for service, level, words, trace and time window. */
+function InterpretationLine({ q, hasMore, count }: { q: AiInterpretation; hasMore: boolean; count: number }) {
+  const { t, lang } = useLanguage();
+  const locale = lang === "he" ? "he-IL" : "en-US";
+  const fmt = (iso: string) => new Date(iso).toLocaleString(locale, { dateStyle: "short", timeStyle: "short" });
+  const chips: string[] = [];
+  if (q.service) chips.push(q.service);
+  if (q.logLevel !== null && q.logLevel !== undefined) chips.push(LEVEL_LABEL[q.logLevel] ?? String(q.logLevel));
+  q.words.forEach((w) => chips.push(w));
+  if (q.traceId) chips.push(`trace ${q.traceId.slice(0, 8)}…`);
+  chips.push(t.search.aiTimeWindow.replace("{from}", fmt(q.from)).replace("{to}", fmt(q.to)));
+
+  return (
+    <div className="flex flex-col gap-space-xs mb-space-sm">
+      <div className="flex flex-wrap items-center gap-space-xs">
+        <span className="font-label-sm text-label-sm text-on-surface-variant uppercase tracking-wider">
+          {t.search.aiInterpretedAs}
+        </span>
+        {chips.map((c, i) => (
+          <span key={`${c}-${i}`} className="font-code text-code-sm text-secondary bg-secondary-container/20 px-space-sm py-0.5 rounded-full">
+            {c}
+          </span>
+        ))}
+      </div>
+      {q.translator === "naive" && (
+        <p className="flex items-center gap-1 font-body-sm text-body-sm text-tertiary">
+          <Icon name="info" size={15} />
+          {t.search.aiFallbackNote}
+        </p>
+      )}
+      {hasMore && (
+        <p className="font-body-sm text-body-sm text-on-surface-variant">{t.search.aiMore.replace("{count}", String(count))}</p>
+      )}
+    </div>
+  );
+}
 
 function TraceChip({ traceId, onTrace }: { traceId: string; onTrace: (traceId: string) => void }) {
   const { t } = useLanguage();
@@ -277,6 +314,8 @@ export default function SearchPage() {
   const [nlQuestion, setNlQuestion] = useState("");
   const [structuredQuery, setStructuredQuery] = useState<ServerQuery | null>(null);
   const [aiResults, setAiResults] = useState<LogEntry[] | null>(null);
+  const [aiInterpretation, setAiInterpretation] = useState<AiInterpretation | null>(null);
+  const [aiHasMore, setAiHasMore] = useState(false);
   const [aiLoading, setAiLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [lastMode, setLastMode] = useState<"structured" | "ai" | null>(null);
@@ -330,11 +369,14 @@ export default function SearchPage() {
     setStructuredQuery(null);
     try {
       const res = await askAi(nlQuestion);
-      const typed = res as { results?: LogEntry[] };
-      setAiResults([...(typed.results ?? [])].reverse());
+      setAiResults(res.results ?? []); // already newest first
+      setAiInterpretation(res.interpretedAs ?? null);
+      setAiHasMore(Boolean(res.hasMore));
     } catch (e) {
       setError(`${t.search.aiErrorPrefix}: ${(e as Error).message}`);
       setAiResults(null);
+      setAiInterpretation(null);
+      setAiHasMore(false);
     } finally {
       setAiLoading(false);
     }
@@ -431,6 +473,7 @@ export default function SearchPage() {
                   <li>{t.search.helpService}</li>
                   <li>{t.search.helpTrace}</li>
                   <li>{t.search.helpIds}</li>
+                  <li>{t.search.helpAi}</li>
                   <li>{t.search.helpWindow}</li>
                 </ul>
               </InfoHint>
@@ -589,6 +632,10 @@ export default function SearchPage() {
               {viewToggle}
             </div>
           </div>
+
+          {showAi && !aiLoading && aiInterpretation && (
+            <InterpretationLine q={aiInterpretation} hasMore={aiHasMore} count={resultCount} />
+          )}
 
           {resultsLoading
             ? spinner

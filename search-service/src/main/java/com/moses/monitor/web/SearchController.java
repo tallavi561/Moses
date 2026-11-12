@@ -28,8 +28,9 @@ public class SearchController {
                                   @RequestParam Instant from,
                                   @RequestParam Instant to,
                                   @RequestParam(required = false) Integer logLevel,
-                                  @RequestParam(required = false) String service) {
-        return searchService.search(new SearchQuery(words, from, to, logLevel, service));
+                                  @RequestParam(required = false) String service,
+                                  @RequestParam(required = false) String traceId) {
+        return searchService.search(new SearchQuery(words, from, to, logLevel, service, traceId));
     }
 
     /** Everything that happened for one request (traceId), across services, oldest first. */
@@ -44,11 +45,12 @@ public class SearchController {
                                @RequestParam Instant to,
                                @RequestParam(required = false) Integer logLevel,
                                @RequestParam(required = false) String service,
+                               @RequestParam(required = false) String traceId,
                                @RequestParam(required = false) Instant before,
                                @RequestParam(required = false) String beforeId,
                                @RequestParam(defaultValue = "100") int limit) {
         int boundedLimit = Math.max(1, Math.min(limit, 200));
-        return searchService.searchPage(new SearchQuery(words, from, to, logLevel, service),
+        return searchService.searchPage(new SearchQuery(words, from, to, logLevel, service, traceId),
                 before, beforeId, boundedLimit);
     }
 }

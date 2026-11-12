@@ -82,7 +82,7 @@ worth naming so they don't surprise later:
 | `ingestion-service` | Writes to `logs` + `index_buckets`, tokenization, in-memory buffer + flush, TTL retention | **Fully implemented** |
 | `search-service` | Read-only search algorithm (macro-filter → intersection → micro-filter) | **Fully implemented** |
 | `process-monitor-service` | Process/service heartbeats, current topology for the flow diagram | **Skeleton** - heartbeat ingest + state read-back only, no history/alerting yet |
-| `ai-service` | NL query → structured search-service call; anomaly detection; summarization | **Skeleton** - NL→query pipeline works end-to-end with a rule-based (non-LLM) translator; anomaly-check and summarize endpoints return 501 Not Implemented |
+| `ai-service` | NL query → structured search-service call; anomaly detection; summarization | **Partly built** - NL→query via a provider-agnostic LLM (rule-based fallback without a key); anomaly-check and summarize endpoints return 501 Not Implemented |
 | `api-gateway` | Single public entry point, reverse proxy, CORS | **Fully implemented** |
 | `frontend` | React UI: sidebar nav, search, flow diagram, settings | **Shell built per UX spec** (frontend/מסמך אפיון.docx) - collapsible sidebar, EN/HE i18n (English default, layout never mirrors to RTL - only text changes), dark-default theme with manual toggle. Dashboard/Uploads are "coming soon" stubs |
 
@@ -137,14 +137,19 @@ are real gaps worth tracking rather than "discovering" again in six months:
    of* the owner's search algorithm only - no separate ML models at this stage)
 
 - **NL query → search-service**: `ai-service`'s `NlQueryController` translates a
-  free-text question into `{words, from, to, logLevel}` and calls
-  `search-service`'s `/api/search` over HTTP. The current `NaiveNlQueryTranslator`
-  is an explicit **placeholder** - a rule-based heuristic (stop-word stripping,
-  "last 1 hour" default, literal error/warning keyword match), not real language
-  understanding. It exists so the full pipeline (UI → ai-service → search-service
-  → UI) could be built and tested before committing to an LLM integration (API key
-  handling, which model, cost) - that's a decision for the user to make explicitly,
-  not one to make silently inside a dependency.
+  free-text question into `{words, service, logLevel, traceId, from, to}` and calls
+  `search-service`'s `/api/search/page` over HTTP (newest first, 200 max, `hasMore`).
+  The translator is `LlmQueryTranslator`: a language model reads the question plus
+  the list of known service names (never log content), and its JSON reply is
+  validated and clamped (unknown service dropped, level 0-5, window <= 14 days,
+  <= 8 words). The model is **provider-agnostic and chosen purely by config** via the
+  one-method `LlmClient` interface: `AnthropicLlmClient` (official SDK) and
+  `OpenAiCompatibleLlmClient` (OpenAI, OpenRouter, Groq, Together, Gemini compat,
+  Ollama/vLLM...). Env: `LLM_PROVIDER` (`anthropic` | `openai-compatible` | `none`),
+  `LLM_MODEL`, `LLM_API_KEY`, `LLM_BASE_URL`. With no provider/key, or on any LLM
+  failure, it falls back to the old rule-based `NaiveNlQueryTranslator`, and the
+  response says so (`interpretedAs.translator` / `fallbackReason`) - the UI shows
+  how the question was understood either way.
 - **Anomaly detection** and **summarization**: endpoints exist and return
   `501 Not Implemented` on purpose - no detection rules or summarization approach
   have been designed yet. Placeholder > fabricated behavior.

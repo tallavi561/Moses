@@ -11,3 +11,17 @@ spring:
 moses:
   search-service:
     url: ${SEARCH_SERVICE_URL:http://localhost:8082}
+  process-monitor:
+    url: ${PROCESS_MONITOR_SERVICE_URL:http://localhost:8083}
+  # Language model used to understand free-text questions. Provider-agnostic: pick it by config.
+  #   LLM_PROVIDER: anthropic | openai-compatible | none (default: none -> rule-based translator)
+  #   LLM_MODEL:    model id for that provider (e.g. claude-opus-5-5, gpt-4o-mini, llama3.1)
+  #   LLM_API_KEY:  provider key (secret - set in the environment only)
+  #   LLM_BASE_URL: API root; required for openai-compatible (e.g. https://api.openai.com/v1),
+  #                 optional override for anthropic
+  llm:
+    provider: ${LLM_PROVIDER:none}
+    model: ${LLM_MODEL:}
+    api-key: ${LLM_API_KEY:}
+    base-url: ${LLM_BASE_URL:}
+    timeout-seconds: ${LLM_TIMEOUT_SECONDS:20}

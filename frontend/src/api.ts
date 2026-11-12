@@ -184,7 +184,27 @@ export async function deleteConnection(id: string): Promise<void> {
   if (!res.ok) throw new Error(`Failed to delete connection: ${res.status}`);
 }
 
-export async function askAi(question: string): Promise<unknown> {
+/** How the AI service understood a free-text question. */
+export interface AiInterpretation {
+  words: string[];
+  from: string;
+  to: string;
+  logLevel: number | null;
+  service: string | null;
+  traceId: string | null;
+  /** "llm", or "naive" when the rule-based fallback was used. */
+  translator: "llm" | "naive";
+  fallbackReason: string | null;
+}
+
+export interface AiQueryResponse {
+  interpretedAs: AiInterpretation;
+  /** Newest first. */
+  results: LogEntry[];
+  hasMore: boolean;
+}
+
+export async function askAi(question: string): Promise<AiQueryResponse> {
   const res = await fetch(`${API_BASE_URL}/api/ai/query`, {
     method: "POST",
     headers: { "Content-Type": "application/json" },

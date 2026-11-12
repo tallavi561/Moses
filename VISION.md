@@ -123,14 +123,17 @@ starts on it.
 
 Collecting all six pillars is necessary but not sufficient - the differentiating claim is
 that MoSes's AI layer can look across them together and explain *why* something is wrong,
-not just surface raw numbers. Today's `ai-service` is an explicit placeholder
-(`NaiveNlQueryTranslator` - rule-based keyword extraction from a natural-language
-question into a structured search, not real inference). Growing it toward the vision
-means, roughly, in order of how much groundwork each needs:
+not just surface raw numbers. Today's `ai-service` turns a free-text question into a
+structured search with a language model (provider-agnostic: Anthropic or any
+OpenAI-compatible endpoint, selected by env/API key), falling back to the old rule-based
+`NaiveNlQueryTranslator` when no key is configured. It does not yet reason over results.
+Growing it toward the vision means, roughly, in order of how much groundwork each needs:
 
-1. **Natural-language search over what's already collected** - closest to done; mostly
-   needs a real LLM behind `ai-service` instead of the rule-based stub, operating on
-   data pillars 1-2 which already exist.
+1. **Natural-language search over what's already collected** - **built** (question ->
+   `{words, service, level, traceId, time window}` -> search, with the interpretation shown
+   to the user). Next step in this line, deliberately *not* in the Search page: an
+   "investigator" that runs several searches/trace lookups and answers in prose, on its own
+   nav page (name TBD, e.g. Insights / Investigate / Ask MoSes).
 2. **Anomaly detection** - noticing a service is behaving unusually (error rate, latency,
    restart frequency) without a human asking a question first. Needs pillars 3-4
    (tracing/metrics) to be meaningful beyond "it stopped sending heartbeats."

@@ -15,6 +15,10 @@ public class AiServiceApplication {
 
     @Bean
     public RestTemplate restTemplate(RestTemplateBuilder builder) {
-        return builder.build();
+        // Used for search-service, which may be waking from a free-tier sleep (50s+): bounded, but generous.
+        return builder
+                .setConnectTimeout(java.time.Duration.ofSeconds(10))
+                .setReadTimeout(java.time.Duration.ofSeconds(90))
+                .build();
     }
 }

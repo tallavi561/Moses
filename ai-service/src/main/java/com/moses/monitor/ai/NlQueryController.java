@@ -2,19 +2,22 @@ package com.moses.monitor.ai;
 
 import jakarta.validation.constraints.NotBlank;
 import org.springframework.beans.factory.annotation.Value;
-import org.springframework.web.util.UriComponentsBuilder;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
 import org.springframework.web.client.RestTemplate;
+import org.springframework.web.util.UriComponentsBuilder;
 
-import java.util.List;
+import java.util.LinkedHashMap;
 import java.util.Map;
 
 @RestController
 @RequestMapping("/api/ai")
 public class NlQueryController {
+
+    /** Newest logs returned for one question; the response says when there are more. */
+    static final int RESULT_LIMIT = 200;
 
     private final NlQueryTranslator translator;
     private final RestTemplate restTemplate;
@@ -25,46 +28,43 @@ public class NlQueryController {
                               @Value("${moses.search-service.url}") String searchServiceUrl) {
         this.translator = translator;
         this.restTemplate = restTemplate;
-        this.searchServiceUrl = normalize(searchServiceUrl);
-    }
-
-    /**
-     * Render's {@code fromService} "hostport" property yields a bare "host:port" with no scheme
-     * (unlike the "http://host:port" local default), which {@link UriComponentsBuilder#fromHttpUrl}
-     * would otherwise reject.
-     */
-    private static String normalize(String url) {
-        if (url == null || url.isBlank() || url.startsWith("http://") || url.startsWith("https://")) {
-            return url;
-        }
-        return "http://" + url;
+        this.searchServiceUrl = Urls.normalize(searchServiceUrl);
     }
 
     public record NlQueryRequest(@NotBlank String question) {
     }
 
+    /**
+     * Free-text question -> structured query (LLM, or rule-based fallback) -> search-service.
+     * Results are newest first, at most {@link #RESULT_LIMIT}; {@code hasMore} says if there are more.
+     */
     @PostMapping("/query")
     public Object query(@RequestBody NlQueryRequest request) {
         TranslatedQuery translated = translator.translate(request.question());
 
-        UriComponentsBuilder uriBuilder = UriComponentsBuilder
-                .fromHttpUrl(searchServiceUrl + "/api/search")
+        UriComponentsBuilder uri = UriComponentsBuilder
+                .fromHttpUrl(searchServiceUrl + "/api/search/page")
                 .queryParam("from", translated.getFrom())
-                .queryParam("to", translated.getTo());
+                .queryParam("to", translated.getTo())
+                .queryParam("limit", RESULT_LIMIT);
         for (String word : translated.getWords()) {
-            uriBuilder.queryParam("words", word);
+            uri.queryParam("words", word);
         }
         if (translated.getLogLevel() != null) {
-            uriBuilder.queryParam("logLevel", translated.getLogLevel());
+            uri.queryParam("logLevel", translated.getLogLevel());
         }
-        if (translated.getWords().isEmpty()) {
-            return Map.of(
-                    "interpretedAs", translated,
-                    "results", List.of(),
-                    "note", "No searchable terms extracted from the question - nothing sent to search-service.");
+        if (translated.getService() != null) {
+            uri.queryParam("service", translated.getService());
+        }
+        if (translated.getTraceId() != null) {
+            uri.queryParam("traceId", translated.getTraceId());
         }
 
-        Object results = restTemplate.getForObject(uriBuilder.build().toUri(), Object.class);
-        return Map.of("interpretedAs", translated, "results", results);
+        Map<?, ?> page = restTemplate.getForObject(uri.build().toUri(), Map.class);
+        Map<String, Object> response = new LinkedHashMap<>();
+        response.put("interpretedAs", translated);
+        response.put("results", page == null ? java.util.List.of() : page.get("logs"));
+        response.put("hasMore", page != null && Boolean.TRUE.equals(page.get("hasMore")));
+        return response;
     }
 }

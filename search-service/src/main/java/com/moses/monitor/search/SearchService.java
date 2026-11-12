@@ -38,6 +38,7 @@ public class SearchService {
 
     private static final int MAX_BROWSE_RESULTS = 1000;
     private static final int MAX_TRACE_LOGS = 1000;
+    private static final java.time.Duration MAX_WORD_SEARCH_WINDOW = java.time.Duration.ofDays(31);
 
     private final MongoTemplate mongoTemplate;
     private final Tokenizer tokenizer;
@@ -60,7 +61,7 @@ public class SearchService {
             return fetchAndMicroFilter(null, query);
         }
 
-        List<String> bucketKeys = BucketKeyUtil.bucketKeysInRange(query.getFrom(), query.getTo(), bucketGranularityMinutes);
+        List<String> bucketKeys = bucketKeysFor(query);
         if (bucketKeys.isEmpty()) {
             return List.of();
         }
@@ -71,6 +72,16 @@ public class SearchService {
         }
 
         return fetchAndMicroFilter(candidateIds, query);
+    }
+
+    /**
+     * One index key per time bucket, so an absurd range (e.g. years) would allocate millions of keys.
+     * The index never holds more than the retention window anyway, so look-back is capped.
+     */
+    private List<String> bucketKeysFor(SearchQuery query) {
+        Instant earliest = query.getTo().minus(MAX_WORD_SEARCH_WINDOW);
+        Instant from = query.getFrom().isBefore(earliest) ? earliest : query.getFrom();
+        return BucketKeyUtil.bucketKeysInRange(from, query.getTo(), bucketGranularityMinutes);
     }
 
     /**
@@ -119,7 +130,7 @@ public class SearchService {
         boolean noWords = query.getWords() == null || query.getWords().isEmpty();
         Set<String> candidateIds = null;
         if (!noWords) {
-            List<String> bucketKeys = BucketKeyUtil.bucketKeysInRange(query.getFrom(), query.getTo(), bucketGranularityMinutes);
+            List<String> bucketKeys = bucketKeysFor(query);
             if (bucketKeys.isEmpty()) {
                 return new LogPage(List.of(), false);
             }
