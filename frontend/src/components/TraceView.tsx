@@ -105,9 +105,82 @@ function SpanTooltip({ hover, scale }: { hover: HoverState; scale: TraceScale })
   );
 }
 
+/** The tooltip's content in full (every log, untruncated), shown inline when a row is clicked. */
+function SpanDetailsPanel({ span, scale, onCollapse }: { span: TraceSpan; scale: TraceScale; onCollapse: () => void }) {
+  const { t, lang } = useLanguage();
+  const duration = span.end - span.start;
+  const locale = lang === "he" ? "he-IL" : "en-US";
+  return (
+    <div className="bg-surface-container-high rounded-xl p-space-sm mb-space-xs font-body-sm text-body-sm text-on-surface">
+      <div className="flex items-start justify-between gap-space-sm mb-1">
+        <div className="flex items-center gap-space-xs min-w-0">
+          <span className="font-headline text-headline-sm truncate">{span.service}</span>
+          <LevelBadge level={span.maxLevel} />
+        </div>
+        <button
+          type="button"
+          className="shrink-0 flex items-center gap-1 px-space-sm py-0.5 rounded-lg bg-surface-container hover:bg-surface-bright font-label-md text-label-md transition-colors"
+          onClick={onCollapse}
+        >
+          <Icon name="close" size={14} />
+          {t.search.traceCollapse}
+        </button>
+      </div>
+      <p className="font-code text-code-sm text-secondary mb-space-xs break-words">{span.label}</p>
+      <dl className="grid grid-cols-[auto_1fr] gap-x-space-sm gap-y-0.5 font-code text-code-sm">
+        <dt className="text-on-surface-variant">{t.search.traceDuration}</dt>
+        <dd>{span.hasDuration ? formatDuration(duration) : t.search.traceNoDuration}</dd>
+        <dt className="text-on-surface-variant">{t.search.traceStart}</dt>
+        <dd>
+          +{formatDuration(span.start - scale.t0)}
+          <span className="text-on-surface-variant"> ({new Date(span.start).toLocaleTimeString(locale)})</span>
+        </dd>
+        {span.hasDuration && (
+          <>
+            <dt className="text-on-surface-variant">{t.search.traceEnd}</dt>
+            <dd>+{formatDuration(span.end - scale.t0)}</dd>
+          </>
+        )}
+        {span.spanId && (
+          <>
+            <dt className="text-on-surface-variant">{t.search.traceSpanId}</dt>
+            <dd className="break-all">{span.spanId}</dd>
+          </>
+        )}
+        {span.details
+          .filter(([k]) => k !== "method" && k !== "path" && k !== "durationMs")
+          .map(([k, v]) => (
+            <div key={k} className="contents">
+              <dt className="text-on-surface-variant">{k}</dt>
+              <dd className="break-all">{v}</dd>
+            </div>
+          ))}
+      </dl>
+      <div className="mt-space-xs border-t border-outline-variant/30 pt-space-xs">
+        <span className="text-on-surface-variant font-label-sm text-label-sm uppercase tracking-wider">
+          {t.search.traceLogsInSpan} ({span.logs.length})
+        </span>
+        {span.logs.map((log) => (
+          <p key={log.logId} className="font-code text-code-sm text-on-surface whitespace-pre-wrap break-words mt-1">
+            {log.rawMessage}
+          </p>
+        ))}
+      </div>
+    </div>
+  );
+}
+
 function Timeline({ spans, logScale, scale }: { spans: TraceSpan[]; logScale: boolean; scale: TraceScale }) {
   const { t } = useLanguage();
   const [hover, setHover] = useState<HoverState | null>(null);
+  const [expanded, setExpanded] = useState<Set<string>>(new Set());
+  const toggle = (key: string) =>
+    setExpanded((prev) => {
+      const next = new Set(prev);
+      if (next.has(key)) next.delete(key);
+      else next.add(key);
+      return next;
+    });
   const services = useMemo(() => [...new Set(spans.map((s) => s.service))], [spans]);
   const colorOf = (service: string) => SERVICE_PALETTE[services.indexOf(service) % SERVICE_PALETTE.length];
 
@@ -140,13 +213,27 @@ function Timeline({ spans, logScale, scale }: { spans: TraceSpan[]; logScale: bo
             const color = colorOf(span.service);
             const isError = span.maxLevel >= 4;
             const duration = span.end - span.start;
+            const isOpen = expanded.has(span.key);
             const hovered = hover?.span.key === span.key;
             const labelOnRight = x1 <= 0.8;
             return (
+              <div key={span.key}>
               <div
-                key={span.key}
-                className={`flex items-center transition-colors ${hovered ? "bg-surface-container-high" : ""}`}
+                role="button"
+                tabIndex={0}
+                aria-expanded={isOpen}
+                className={`flex items-center cursor-pointer transition-colors ${hovered || isOpen ? "bg-surface-container-high" : ""}`}
                 style={{ height: ROW_HEIGHT }}
+                onClick={() => {
+                  toggle(span.key);
+                  setHover(null);
+                }}
+                onKeyDown={(e) => {
+                  if (e.key === "Enter" || e.key === " ") {
+                    e.preventDefault();
+                    toggle(span.key);
+                  }
+                }}
                 onMouseMove={(e) => setHover({ span, x: e.clientX, y: e.clientY })}
                 onMouseLeave={() => setHover(null)}
               >
@@ -190,6 +277,8 @@ function Timeline({ spans, logScale, scale }: { spans: TraceSpan[]; logScale: bo
                   </span>
                 </div>
               </div>
+              {isOpen && <SpanDetailsPanel span={span} scale={scale} onCollapse={() => toggle(span.key)} />}
+              </div>
             );
           })}
         </div>
@@ -201,7 +290,7 @@ function Timeline({ spans, logScale, scale }: { spans: TraceSpan[]; logScale: bo
           </p>
         )}
       </div>
-      {hover && <SpanTooltip hover={hover} scale={scale} />}
+      {hover && !expanded.has(hover.span.key) && <SpanTooltip hover={hover} scale={scale} />}
     </div>
   );
 }
