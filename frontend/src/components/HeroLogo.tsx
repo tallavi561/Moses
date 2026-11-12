@@ -1,10 +1,13 @@
 import { useEffect, useRef, useState } from "react";
-import video from "../assets/hero-logo.mp4";
+import introVideo from "../assets/hero-logo.mp4";
+import loopVideo from "../assets/hero-loop.mp4";
 import firstFrame from "../assets/hero-logo-first.webp";
 import lastFrame from "../assets/hero-logo-last.webp";
 
-/** The intro plays once per page load; screens opened afterwards show the finished frame. */
-let hasPlayed = false;
+/** The intro plays once per page load; screens opened afterwards go straight to the idle loop. */
+let hasPlayedIntro = false;
+
+type Phase = "intro" | "loop" | "still";
 
 function prefersReducedMotion(): boolean {
   return typeof window !== "undefined" && !!window.matchMedia?.("(prefers-reduced-motion: reduce)").matches;
@@ -16,24 +19,35 @@ interface HeroLogoProps {
 }
 
 /**
- * Large, horizontally centered intro logo. The video is not looped, so when it ends the browser
- * simply holds the last frame. If it can't autoplay (blocked, unsupported) or the user prefers
- * reduced motion, the last frame is shown as a still instead.
+ * Large, horizontally centered logo in two stages:
+ *   1. the intro video plays once (not looped), ending on its last frame;
+ *   2. the idle loop takes over. Its first frame IS that last frame (see scripts/make-hero-loop.py),
+ *      so the hand-off is invisible, and it repeats forever with very subtle motion.
+ * Both videos sit on top of each other and only one is visible at a time (they are blended with
+ * the page, so showing both would add their brightness). Reduced motion, a blocked autoplay or a
+ * broken video fall back to the last frame as a still image.
  */
 export default function HeroLogo({ compact = false }: HeroLogoProps) {
-  const [play] = useState(() => !hasPlayed && !prefersReducedMotion());
-  const [stillOnly, setStillOnly] = useState(!play);
-  const ref = useRef<HTMLVideoElement>(null);
+  const [phase, setPhase] = useState<Phase>(() =>
+    prefersReducedMotion() ? "still" : hasPlayedIntro ? "loop" : "intro"
+  );
+  const [loopBroken, setLoopBroken] = useState(false);
+  const introRef = useRef<HTMLVideoElement>(null);
+  const loopRef = useRef<HTMLVideoElement>(null);
 
+  const shown: Phase = phase === "loop" && loopBroken ? "still" : phase;
+
+  // Start whichever video is current once the tab is visible (browsers won't start one in a
+  // background tab).
   useEffect(() => {
-    if (!play) return;
-    hasPlayed = true;
-    const start = () => ref.current?.play().catch(() => setStillOnly(true));
+    if (phase === "still") return;
+    const video = phase === "intro" ? introRef.current : loopRef.current;
+    if (phase === "intro") hasPlayedIntro = true;
+    const start = () => video?.play().catch(() => setPhase("still"));
     if (!document.hidden) {
       start();
       return;
     }
-    // Opened in a background tab: browsers won't start it, so begin once the tab is shown.
     const onVisible = () => {
       if (document.hidden) return;
       document.removeEventListener("visibilitychange", onVisible);
@@ -41,26 +55,45 @@ export default function HeroLogo({ compact = false }: HeroLogoProps) {
     };
     document.addEventListener("visibilitychange", onVisible);
     return () => document.removeEventListener("visibilitychange", onVisible);
-  }, [play]);
+  }, [phase]);
+
+  const hidden = (visible: boolean) => (visible ? undefined : "hero-logo__hidden");
 
   return (
     <div className={`hero-logo ${compact ? "hero-logo--compact" : ""}`} role="img" aria-label="MoSes Monitor">
-      {stillOnly ? (
-        <img src={lastFrame} alt="" draggable={false} />
-      ) : (
-        <video
-          ref={ref}
-          src={video}
-          poster={firstFrame}
-          muted
-          playsInline
-          autoPlay
-          preload="auto"
-          disablePictureInPicture
-          tabIndex={-1}
-          onError={() => setStillOnly(true)}
-        />
+      {phase !== "still" && (
+        <>
+          {phase === "intro" && (
+            <video
+              ref={introRef}
+              src={introVideo}
+              poster={firstFrame}
+              muted
+              playsInline
+              preload="auto"
+              disablePictureInPicture
+              tabIndex={-1}
+              onEnded={() => setPhase("loop")}
+              onError={() => setPhase(loopBroken ? "still" : "loop")}
+            />
+          )}
+          {/* Mounted from the start so it is decoded and waiting at frame 1 when the intro ends. */}
+          <video
+            ref={loopRef}
+            className={hidden(shown === "loop")}
+            src={loopVideo}
+            poster={lastFrame}
+            muted
+            loop
+            playsInline
+            preload="auto"
+            disablePictureInPicture
+            tabIndex={-1}
+            onError={() => setLoopBroken(true)}
+          />
+        </>
       )}
+      {shown === "still" && <img src={lastFrame} alt="" draggable={false} />}
     </div>
   );
 }
