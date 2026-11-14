@@ -1,0 +1,27 @@
+server:
+  port: ${PORT:8086}
+  error:
+    # Lets the UI read the short reason on a 4xx (e.g. "email already registered").
+    include-message: always
+
+spring:
+  threads:
+    virtual:
+      enabled: true
+  application:
+    name: auth-service
+  data:
+    mongodb:
+      uri: ${MONGODB_URI:mongodb://localhost:27017/moses_monitor}
+      # users.email (unique) and the invite TTL index are declared on the documents.
+      auto-index-creation: true
+
+moses:
+  jwt:
+    # Signing key for login tokens, shared with api-gateway (which verifies them). No default
+    # on purpose: the service refuses to start without one, so a deployment can never run on
+    # a publicly known key. At least 32 characters.
+    secret: ${JWT_SECRET:}
+    ttl-hours: ${JWT_TTL_HOURS:168}
+  invites:
+    ttl-days: ${INVITE_TTL_DAYS:7}

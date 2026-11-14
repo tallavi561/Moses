@@ -7,23 +7,29 @@ import { Icon } from "../icons";
 import HeroLogo from "../components/HeroLogo";
 
 export default function ProjectsListPage() {
-  const { projects, selectProject, createProject } = useProjects();
+  const { projects, loading, error, reload, selectProject, createProject } = useProjects();
   const { t } = useLanguage();
   const { user, signOut } = useAuth();
   const navigate = useNavigate();
   const [newName, setNewName] = useState("");
   const [creating, setCreating] = useState(false);
+  const [createFailed, setCreateFailed] = useState(false);
 
   function openProject(id: string) {
     selectProject(id);
     navigate(`/p/${id}/search`);
   }
 
-  function handleCreate() {
+  async function handleCreate() {
     const name = newName.trim();
     if (!name) return;
-    const project = createProject(name);
-    navigate(`/p/${project.id}/search`);
+    setCreateFailed(false);
+    try {
+      const project = await createProject(name);
+      navigate(`/p/${project.id}/search`);
+    } catch {
+      setCreateFailed(true);
+    }
   }
 
   return (
@@ -51,8 +57,21 @@ export default function ProjectsListPage() {
 
         <section className="bg-surface-container-low rounded-2xl shadow-sm p-space-lg">
           <h2 className="font-headline text-headline-md text-on-surface mb-space-sm">{t.projects.title}</h2>
-          {projects.length === 0 ? (
-            <p className="font-body-md text-body-md text-on-surface-variant">{t.projects.noOtherProjects}</p>
+          {loading ? (
+            <p className="font-body-md text-body-md text-on-surface-variant">{t.projects.loading}</p>
+          ) : error ? (
+            <div className="flex items-center gap-space-md">
+              <p className="font-body-md text-body-md text-error">{t.projects.loadFailed}</p>
+              <button
+                className="px-space-md py-1.5 rounded-xl bg-surface-container-high hover:bg-surface-bright text-on-surface font-headline text-headline-sm transition-colors"
+                onClick={() => void reload()}
+                type="button"
+              >
+                {t.projects.retry}
+              </button>
+            </div>
+          ) : projects.length === 0 ? (
+            <p className="font-body-md text-body-md text-on-surface-variant">{t.projects.none}</p>
           ) : (
             <ul className="flex flex-col gap-space-xs">
               {projects.map((p) => (
@@ -119,6 +138,11 @@ export default function ProjectsListPage() {
               <Icon name="add_circle" size={18} className="text-secondary" />
               {t.projects.newProject}
             </button>
+          )}
+          {createFailed && (
+            <p className="font-body-sm text-body-sm text-error mt-space-sm" role="alert">
+              {t.projects.createFailed}
+            </p>
           )}
         </section>
       </div>

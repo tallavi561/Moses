@@ -14,12 +14,17 @@ const OFFSET: Record<string, string> = {
 export default function Layout() {
   const sidebar = useSidebarState();
   const { projectId } = useParams<{ projectId: string }>();
-  const { projects, selectProject } = useProjects();
+  const { projects, loading, selectProject } = useProjects();
   const projectExists = projects.some((p) => p.id === projectId);
 
   useEffect(() => {
     if (projectId && projectExists) selectProject(projectId);
   }, [projectId, projectExists, selectProject]);
+
+  // Projects come from the server now: wait for them before deciding the id is unknown.
+  if (loading) {
+    return <div className="min-h-screen bg-background" />;
+  }
 
   if (!projectId || !projectExists) {
     return <Navigate to="/projects" replace />;

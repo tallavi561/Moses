@@ -94,9 +94,12 @@ public class ProxyController {
                 }
             } catch (org.springframework.web.client.ResourceAccessException e) {
                 // A read timeout means the backend got the request, so don't replay it.
-                boolean readTimeout = e.getCause() instanceof java.net.SocketTimeoutException
-                        && !(e.getCause() instanceof java.net.http.HttpConnectTimeoutException)
-                        && String.valueOf(e.getCause().getMessage()).toLowerCase().contains("read");
+                Throwable cause = e.getCause();
+                boolean connectTimeout = cause instanceof java.net.http.HttpConnectTimeoutException;
+                boolean readTimeout = !connectTimeout
+                        && (cause instanceof java.net.http.HttpTimeoutException
+                        || (cause instanceof java.net.SocketTimeoutException
+                        && String.valueOf(cause.getMessage()).toLowerCase().contains("read")));
                 if (readTimeout || System.currentTimeMillis() + RETRY_DELAY_MS > deadline) {
                     throw e;
                 }

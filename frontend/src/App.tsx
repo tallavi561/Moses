@@ -10,6 +10,7 @@ import ProjectsListPage from "./pages/ProjectsListPage";
 import SearchPage from "./pages/SearchPage";
 import FlowPage from "./pages/FlowPage";
 import SettingsPage from "./pages/SettingsPage";
+import JoinPage from "./pages/JoinPage";
 import ComingSoonPage from "./pages/ComingSoonPage";
 import "./App.css";
 
@@ -24,6 +25,7 @@ export default function App() {
 
               <Route element={<RequireAuth />}>
                 <Route path="/projects" element={<ProjectsListPage />} />
+                <Route path="/join/:token" element={<JoinPage />} />
 
                 <Route path="/p/:projectId" element={<Layout />}>
                   <Route index element={<Navigate to="search" replace />} />

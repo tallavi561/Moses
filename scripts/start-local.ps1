@@ -1,6 +1,7 @@
 <#
 .SYNOPSIS
-  Builds and starts all 6 MoSes services locally, each in its own terminal window.
+  Builds and starts all 7 MoSes services locally, each in its own tab of a single
+  Windows Terminal window (or its own PowerShell window if Windows Terminal is missing).
   Requires: Java 21, Maven, Node.js, and MongoDB reachable at localhost:27017.
 #>
 
@@ -20,21 +21,14 @@ mvn -q clean package -DskipTests
 if ($LASTEXITCODE -ne 0) { Write-Host "Maven build failed." -ForegroundColor Red; exit 1 }
 Pop-Location
 
-function Start-JavaService($name, $jarPath, $port) {
-    Write-Host "==> Starting $name on port $port..." -ForegroundColor Cyan
-    Start-Process powershell -ArgumentList "-NoExit", "-Command", "cd '$root'; java -jar '$jarPath'" -WindowStyle Normal
+# auth-service signs login tokens and api-gateway verifies them with the same key; both refuse
+# to start without one. This fixed value is for local development only - a real deployment
+# sets its own JWT_SECRET (see render.yaml). The windows started below inherit it.
+if (-not $env:JWT_SECRET) {
+    $env:JWT_SECRET = "local-dev-only-jwt-secret-do-not-use-in-production"
 }
 
-Start-JavaService "ingestion-service" "$root\ingestion-service\target\ingestion-service.jar" 8081
-Start-JavaService "search-service" "$root\search-service\target\search-service.jar" 8082
-Start-JavaService "process-monitor-service" "$root\process-monitor-service\target\process-monitor-service.jar" 8083
-Start-JavaService "ai-service" "$root\ai-service\target\ai-service.jar" 8084
-Start-JavaService "api-gateway" "$root\api-gateway\target\api-gateway.jar" 8085
-
-Write-Host "==> Waiting for backend services to come up..." -ForegroundColor Cyan
-Start-Sleep -Seconds 10
-
-Write-Host "==> Starting frontend (npm run dev)..." -ForegroundColor Cyan
+Write-Host "==> Preparing frontend..." -ForegroundColor Cyan
 if (-not (Test-Path "$root\frontend\node_modules")) {
     Push-Location "$root\frontend"
     npm install --legacy-peer-deps
@@ -43,15 +37,49 @@ if (-not (Test-Path "$root\frontend\node_modules")) {
 if (-not (Test-Path "$root\frontend\.env.local")) {
     "VITE_API_BASE_URL=http://localhost:8085" | Out-File -FilePath "$root\frontend\.env.local" -Encoding utf8
 }
-Start-Process powershell -ArgumentList "-NoExit", "-Command", "cd '$root\frontend'; npm run dev" -WindowStyle Normal
+
+# One entry per tab: title, working directory, and the command to run in it.
+$quotedSecret = $env:JWT_SECRET.Replace("'", "''")
+$tabs = foreach ($name in "ingestion-service", "search-service", "process-monitor-service", "ai-service", "auth-service", "api-gateway") {
+    # JWT_SECRET is set inside the tab itself: a tab opened by an already-running
+    # Windows Terminal does not reliably inherit this script's environment.
+    @{ Title = $name; Dir = $root; Command = "`$env:JWT_SECRET = '$quotedSecret'; java -jar '$root\$name\target\$name.jar'" }
+}
+$tabs += @{ Title = "frontend"; Dir = "$root\frontend"; Command = "npm run dev" }
+
+# Prefer Windows Terminal: a single window with one tab per service.
+$wt = (Get-Command wt.exe -ErrorAction SilentlyContinue).Source
+if (-not $wt) {
+    $candidate = Join-Path $env:LOCALAPPDATA "Microsoft\WindowsApps\wt.exe"
+    if (Test-Path $candidate) { $wt = $candidate }
+}
+
+Write-Host "==> Starting $($tabs.Count) services..." -ForegroundColor Cyan
+if ($wt) {
+    $wtTabs = foreach ($tab in $tabs) {
+        # -EncodedCommand keeps quotes and ';' (Windows Terminal's own separator) out of the command line.
+        $encoded = [Convert]::ToBase64String([System.Text.Encoding]::Unicode.GetBytes($tab.Command))
+        "new-tab --title `"$($tab.Title)`" --suppressApplicationTitle -d `"$($tab.Dir)`" powershell -NoExit -EncodedCommand $encoded"
+    }
+    Start-Process $wt -ArgumentList ("-w new " + ($wtTabs -join " ; "))
+    $where = "as tabs in one Windows Terminal window"
+}
+else {
+    # No Windows Terminal: fall back to a separate PowerShell window per service.
+    foreach ($tab in $tabs) {
+        Start-Process powershell -ArgumentList "-NoExit", "-Command", "cd '$($tab.Dir)'; $($tab.Command)" -WindowStyle Normal
+    }
+    $where = "in separate windows"
+}
 
 Write-Host ""
-Write-Host "All services starting in separate windows:" -ForegroundColor Green
+Write-Host "All services starting ${where}:" -ForegroundColor Green
 Write-Host "  ingestion-service        http://localhost:8081"
 Write-Host "  search-service           http://localhost:8082"
 Write-Host "  process-monitor-service  http://localhost:8083"
 Write-Host "  ai-service               http://localhost:8084"
+Write-Host "  auth-service             http://localhost:8086"
 Write-Host "  api-gateway              http://localhost:8085  (frontend talks to this)"
 Write-Host "  frontend (Vite dev)      http://localhost:5173"
 Write-Host ""
-Write-Host "Open http://localhost:5173 once the frontend window shows 'ready'." -ForegroundColor Green
+Write-Host "Open http://localhost:5173 once the frontend tab shows 'ready'." -ForegroundColor Green

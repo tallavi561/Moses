@@ -12,3 +12,6 @@ frontend/dist/
 # Word lock files (not real content)
 ~$*.docx
 scripts/keepalive.log
+
+# Local secrets/keys - never commit
+secrets/

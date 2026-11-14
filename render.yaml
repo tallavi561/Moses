@@ -77,32 +77,44 @@ services:
         sync: false
 
   - type: web
+    name: auth-service
+    env: docker
+    dockerfilePath: ./auth-service/Dockerfile
+    dockerContext: .
+    plan: free
+    envVars:
+      - key: MONGODB_URI
+        sync: false
+      # Signing key for login tokens: a long random string (32+ characters), and the SAME
+      # value here and on api-gateway. Neither service starts without it.
+      - key: JWT_SECRET
+        sync: false
+
+  - type: web
     name: api-gateway
     env: docker
     dockerfilePath: ./api-gateway/Dockerfile
     dockerContext: .
     plan: free
     envVars:
+      # Must equal auth-service's JWT_SECRET - the gateway verifies the tokens it issues.
+      - key: JWT_SECRET
+        sync: false
+      - key: AUTH_SERVICE_URL
+        sync: false
+      # Downstream URLs are the services' PUBLIC https://*.onrender.com URLs, set by hand
+      # in the dashboard. Not fromService/hostport: that is the private-network address,
+      # which the gateway cannot reach reliably here and which cannot wake a sleeping
+      # free-tier backend (see ARCHITECTURE.md "Gotchas"). sync: false also stops a
+      # Blueprint sync from overwriting the dashboard values.
       - key: INGESTION_SERVICE_URL
-        fromService:
-          type: web
-          name: ingestion-service
-          property: hostport
+        sync: false
       - key: SEARCH_SERVICE_URL
-        fromService:
-          type: web
-          name: search-service
-          property: hostport
+        sync: false
       - key: PROCESS_MONITOR_SERVICE_URL
-        fromService:
-          type: web
-          name: process-monitor-service
-          property: hostport
+        sync: false
       - key: AI_SERVICE_URL
-        fromService:
-          type: web
-          name: ai-service
-          property: hostport
+        sync: false
       - key: FRONTEND_ORIGIN
         sync: false # set to the deployed frontend's URL once it's known
 

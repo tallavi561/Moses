@@ -18,7 +18,11 @@ public class RouteConfig {
     public RouteConfig(@Value("${moses.routes.ingestion-service}") String ingestionUrl,
                         @Value("${moses.routes.search-service}") String searchUrl,
                         @Value("${moses.routes.process-monitor-service}") String processUrl,
-                        @Value("${moses.routes.ai-service}") String aiUrl) {
+                        @Value("${moses.routes.ai-service}") String aiUrl,
+                        @Value("${moses.routes.auth-service}") String authUrl) {
+        routes.put("/api/auth", normalize(authUrl));
+        routes.put("/api/projects", normalize(authUrl));
+        routes.put("/api/invites", normalize(authUrl));
         routes.put("/api/logs", normalize(ingestionUrl));
         routes.put("/api/search", normalize(searchUrl));
         routes.put("/api/process", normalize(processUrl));

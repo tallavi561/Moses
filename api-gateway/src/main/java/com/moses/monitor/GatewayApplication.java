@@ -16,9 +16,22 @@ public class GatewayApplication {
     @Bean
     public RestTemplate restTemplate(RestTemplateBuilder builder) {
         // Don't throw on 4xx/5xx - the proxy must relay the real downstream status, not swallow it.
+        //
+        // The JDK HttpClient, not the default HttpURLConnection: the latter cannot relay a
+        // downstream 401 on a request with a body (it throws "cannot retry due to server
+        // authentication, in streaming mode"), which turned a wrong password at sign-in into
+        // a 500 after a long retry loop instead of a plain 401.
+        java.net.http.HttpClient httpClient = java.net.http.HttpClient.newBuilder()
+                .version(java.net.http.HttpClient.Version.HTTP_1_1)
+                .followRedirects(java.net.http.HttpClient.Redirect.NORMAL)
+                .connectTimeout(java.time.Duration.ofSeconds(10))
+                .build();
         return builder
-                .setConnectTimeout(java.time.Duration.ofSeconds(10))
-                .setReadTimeout(java.time.Duration.ofSeconds(100))
+                .requestFactory(() -> {
+                    var factory = new org.springframework.http.client.JdkClientHttpRequestFactory(httpClient);
+                    factory.setReadTimeout(java.time.Duration.ofSeconds(100));
+                    return factory;
+                })
                 .errorHandler(new org.springframework.web.client.DefaultResponseErrorHandler() {
             @Override
             public void handleError(org.springframework.http.client.ClientHttpResponse response) {

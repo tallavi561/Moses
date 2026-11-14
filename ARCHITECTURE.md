@@ -1,7 +1,7 @@
 # MoSes Monitor - Architecture & Decision Log
 
 Living document. Captures what the system is, why it's built this way, and which
-decisions are settled vs. still open. Last updated: 2026-11-10.
+decisions are settled vs. still open. Last updated: 2026-11-14.
 
 ## 1. What this is
 
@@ -19,7 +19,8 @@ Target deployment: [Render](https://render.com). Frontend: React.
 
 ## 2. Service topology (decided: full microservices from day one)
 
-Six independently deployable units, all in one monorepo (multi-module Maven for the
+Seven independently deployable units (the diagram below predates `auth-service`, which sits
+behind the gateway like the others and owns its own collections - see §9), all in one monorepo (multi-module Maven for the
 Java services, a separate `frontend/` for React):
 
 ```
@@ -83,7 +84,8 @@ worth naming so they don't surprise later:
 | `search-service` | Read-only search algorithm (macro-filter → intersection → micro-filter) | **Fully implemented** |
 | `process-monitor-service` | Process/service heartbeats, current topology for the flow diagram | **Skeleton** - heartbeat ingest + state read-back only, no history/alerting yet |
 | `ai-service` | NL query → structured search-service call; anomaly detection; summarization | **Partly built** - NL→query via a provider-agnostic LLM (rule-based fallback without a key); anomaly-check and summarize endpoints return 501 Not Implemented |
-| `api-gateway` | Single public entry point, reverse proxy, CORS | **Fully implemented** |
+| `api-gateway` | Single public entry point, reverse proxy, CORS, and the sign-in check on every request (§9) | **Fully implemented** |
+| `auth-service` | User accounts, login tokens, projects with their members and invite links | **Implemented** (email + password; see §9 for what is deliberately not there yet) |
 | `frontend` | React UI: sidebar nav, search, flow diagram, settings | **Shell built per UX spec** (frontend/מסמך אפיון.docx) - collapsible sidebar, EN/HE i18n (English default, layout never mirrors to RTL - only text changes), dark-default theme with manual toggle. Dashboard/Uploads are "coming soon" stubs |
 
 ## 3. The search algorithm (owner-designed, see project_specification.md)
@@ -208,9 +210,9 @@ through `api-gateway`, matching the real deployed topology.
 **Not yet done:**
 - Real LLM integration for NL query understanding (currently a rule-based stub)
 - Anomaly detection and summarization logic (currently 501 stubs)
-- Real authentication/authorization and backend multi-tenancy (the frontend's
-  login/projects UI is still a mock single-user, localStorage-backed shell -
-  **not fine for a real multi-user deployment**, deliberately deferred)
+- Backend multi-tenancy: accounts, projects and membership are real now (§9), but logs,
+  search and architecture data carry no `projectId`, so every signed-in user sees the same
+  monitoring data whichever project is open
 - Repo+AI driven topology discovery (see VISION.md §2/§8)
 
 ## 8. Render deployment
@@ -280,3 +282,54 @@ not done yet as of this writing.
    usually a prior cluster, possibly auto-paused from inactivity.
 6. Free-tier web services spin down after ~15 minutes of inactivity and take
    30-50s to wake on the next request - normal, not a bug.
+
+## 9. Accounts, sign-in and projects (added 2026-11-14)
+
+Built as the prerequisite for the team chat: a chat needs to know who wrote what, and who
+belongs to which team.
+
+**How it works**
+- `auth-service` owns three collections nobody else touches: `users` (email unique and stored
+  lowercased, bcrypt password hash), `projects` (name + embedded member list with a role per
+  member: `OWNER` / `MEMBER`) and `project_invites` (the invite token is the id; a TTL index
+  deletes it at `expires_at`, 7 days by default).
+- Sign-up / sign-in answer with a signed token (JWT, HS256, 7 days by default). The frontend
+  keeps it in `localStorage` and sends it as `Authorization: Bearer ...` on every request
+  (`frontend/src/api.ts`); a 401 on a request that carried a token signs the user out.
+- `api-gateway` verifies the token itself with the shared `JWT_SECRET` (no call to
+  `auth-service` per request) and answers 401 otherwise. Open without a token:
+  `POST /api/auth/login`, `POST /api/auth/register`, `GET /api/invites/{token}` (so the join
+  page can name the project), and - unchanged from before - `POST /api/logs` and
+  `POST /api/process/heartbeat`, which monitored services call.
+- `auth-service` verifies the token again on its own endpoints rather than trusting a header
+  from the gateway, because every backend also has its own public URL on Render.
+- Any user can create a project and becomes its owner. People join in two ways: the owner adds
+  an already-registered user by email, or shares an invite link (`/join/<token>`) that anyone
+  who signs in or signs up can use until it expires.
+
+**Config**: `JWT_SECRET` (32+ characters, the same value on `auth-service` and `api-gateway`;
+both refuse to start without it - there is no default, so a deployment can never run on a
+known key), `JWT_TTL_HOURS`, `INVITE_TTL_DAYS`, and `AUTH_SERVICE_URL` on the gateway.
+`scripts/start-local.ps1` sets a development-only `JWT_SECRET` when none is set.
+
+**Why a bearer token in `localStorage` and not a cookie**: the frontend and the gateway are
+two different `*.onrender.com` sites, and `onrender.com` is a public suffix, so a session
+cookie would be a third-party cookie, which browsers increasingly block. The cost is the
+usual one: a script injected into the page could read the token.
+
+**Deliberately not there yet**
+- **Google and GitHub sign-in - wanted by the owner, planned next to email + password.**
+  `users.password_hash` is already nullable for accounts that will have no password.
+- The other backends (`search-service`, `process-monitor-service`, `ai-service`,
+  `ingestion-service`) still answer anyone who calls their own public Render URL directly;
+  only the gateway enforces sign-in. Closing that means each backend checking the token (or
+  a gateway-only shared key) too.
+- No key on log/heartbeat ingestion (a per-project API key is the natural next step, and is
+  also what would tie incoming data to a project).
+- No password reset, email verification, sign-in rate limiting, token revocation, or
+  removing a member / leaving a project.
+
+**A gateway bug this surfaced (fixed)**: the proxy's `RestTemplate` used the default
+`HttpURLConnection`, which cannot relay a downstream 401 on a request with a body - a wrong
+password became a 500 after the 75-second cold-start retry loop. The gateway now uses the JDK
+`HttpClient` (`JdkClientHttpRequestFactory`).

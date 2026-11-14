@@ -18,3 +18,8 @@ moses:
     search-service: ${SEARCH_SERVICE_URL:http://localhost:8082}
     process-monitor-service: ${PROCESS_MONITOR_SERVICE_URL:http://localhost:8083}
     ai-service: ${AI_SERVICE_URL:http://localhost:8084}
+    auth-service: ${AUTH_SERVICE_URL:http://localhost:8086}
+  jwt:
+    # Same key auth-service signs login tokens with. No default on purpose: the gateway
+    # refuses to start without one. At least 32 characters.
+    secret: ${JWT_SECRET:}

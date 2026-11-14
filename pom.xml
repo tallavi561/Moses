@@ -19,6 +19,7 @@
         <module>search-service</module>
         <module>process-monitor-service</module>
         <module>ai-service</module>
+        <module>auth-service</module>
         <module>api-gateway</module>
     </modules>
 </project>

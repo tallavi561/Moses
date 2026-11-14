@@ -1,69 +1,70 @@
-import { createContext, useContext, useState, type ReactNode } from "react";
+import { createContext, useContext, useEffect, useState, type ReactNode } from "react";
+import { fetchMe, login, register } from "../api";
+import { getSession, setSession, subscribeSession, type Session, type SessionUser } from "./session";
 
 /**
- * MOCK auth. There is no real backend authentication yet (deferred on
- * purpose - see chat). This exists only so the UI flow (login -> projects ->
- * workspace) can be built and tested now; swap this out wholesale once real
- * auth lands, nothing else in the app should need to change since everything
- * reads through useAuth().
+ * Real accounts: email + password against auth-service, which answers with a signed token that
+ * api.ts then sends on every request. Everything else in the app reads the user through
+ * useAuth(), so adding Google/GitHub sign-in later only means another way to obtain a session.
  */
 
-const STORAGE_KEY = "moses.auth";
-
-export interface MockUser {
-  name: string;
-  email: string;
+export interface AuthUser extends SessionUser {
   initials: string;
 }
 
-const DEMO_USER: MockUser = {
-  name: "Demo User",
-  email: "demo@moses.local",
-  initials: "DU",
-};
-
 interface AuthContextValue {
-  user: MockUser | null;
+  user: AuthUser | null;
   isAuthenticated: boolean;
-  signIn: () => void;
+  signIn: (email: string, password: string) => Promise<void>;
+  signUp: (name: string, email: string, password: string) => Promise<void>;
   signOut: () => void;
 }
 
 const AuthContext = createContext<AuthContextValue | null>(null);
 
-function readStored(): boolean {
-  try {
-    return localStorage.getItem(STORAGE_KEY) === "signed-in";
-  } catch {
-    return false;
-  }
+function initialsOf(name: string): string {
+  const parts = name.trim().split(/\s+/).filter(Boolean);
+  const letters = parts.length > 1 ? parts[0][0] + parts[parts.length - 1][0] : (parts[0] ?? "?").slice(0, 2);
+  return letters.toUpperCase();
 }
 
 export function AuthProvider({ children }: { children: ReactNode }) {
-  const [signedIn, setSignedIn] = useState<boolean>(readStored);
+  const [session, setSessionState] = useState<Session | null>(getSession);
 
-  function signIn() {
-    setSignedIn(true);
-    try {
-      localStorage.setItem(STORAGE_KEY, "signed-in");
-    } catch {
-      // ignore - per-viewer convenience only
-    }
+  // Follows sign-in, sign-out, and a session ended by a 401 inside api.ts.
+  useEffect(() => subscribeSession(setSessionState), []);
+
+  // A stored session may be stale (expired token, renamed user): confirm it once on load.
+  // An invalid token answers 401, which api.ts turns into a sign-out.
+  useEffect(() => {
+    const stored = getSession();
+    if (!stored) return;
+    fetchMe()
+      .then((user) => {
+        const latest = getSession();
+        if (latest && latest.token === stored.token) setSession({ token: latest.token, user });
+      })
+      .catch(() => {
+        // offline or the backend is still waking up: keep the stored session
+      });
+  }, []);
+
+  async function signIn(email: string, password: string) {
+    setSession(await login(email, password));
+  }
+
+  async function signUp(name: string, email: string, password: string) {
+    setSession(await register(name, email, password));
   }
 
   function signOut() {
-    setSignedIn(false);
-    try {
-      localStorage.removeItem(STORAGE_KEY);
-    } catch {
-      // ignore
-    }
+    setSession(null);
   }
 
+  const user = session ? { ...session.user, initials: initialsOf(session.user.name) } : null;
+
   return (
-    <AuthContext.Provider
-      value={{ user: signedIn ? DEMO_USER : null, isAuthenticated: signedIn, signIn, signOut }}
-    >
+    <AuthContext.Provider value={{ user, isAuthenticated: user !== null, signIn, signUp, signOut }}>
       {children}
     </AuthContext.Provider>
   );

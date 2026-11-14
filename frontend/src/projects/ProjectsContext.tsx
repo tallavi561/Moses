@@ -1,96 +1,102 @@
-import { createContext, useContext, useState, type ReactNode } from "react";
+import { createContext, useCallback, useContext, useEffect, useState, type ReactNode } from "react";
+import { createProject as apiCreateProject, fetchProjects, type Project } from "../api";
+import { useAuth } from "../auth/AuthContext";
 
 /**
- * MOCK project data. Mongo has no projectId field on anything yet, so
- * switching "projects" here does NOT actually scope logs/flow/search data -
- * it only exists so the UI (switcher, projects list) can be built and
- * tested now. Wiring real per-project data isolation is a backend change
- * for later (see chat).
+ * The signed-in user's projects, loaded from auth-service. A project is a team: its members
+ * are who can be invited to it and (next) who shares its chat.
+ *
+ * Still true: logs/architecture/search data has no projectId yet, so every project currently
+ * shows the same monitoring data. Scoping that data per project is a separate backend change.
  */
 
-const PROJECTS_KEY = "moses.projects";
 const CURRENT_KEY = "moses.currentProjectId";
 
-export interface Project {
-  id: string;
-  name: string;
-}
-
-const SEED_PROJECTS: Project[] = [{ id: "demo", name: "Demo project" }];
+export type { Project };
 
 interface ProjectsContextValue {
   projects: Project[];
+  /** True until the first load for this user has finished (successfully or not). */
+  loading: boolean;
+  error: string | null;
   currentProjectId: string | null;
   currentProject: Project | null;
   selectProject: (id: string) => void;
-  createProject: (name: string) => Project;
+  createProject: (name: string) => Promise<Project>;
+  reload: () => Promise<void>;
 }
 
 const ProjectsContext = createContext<ProjectsContextValue | null>(null);
 
-function readProjects(): Project[] {
+function readCurrentId(): string | null {
   try {
-    const stored = localStorage.getItem(PROJECTS_KEY);
-    if (stored) {
-      const parsed = JSON.parse(stored);
-      if (Array.isArray(parsed) && parsed.length > 0) return parsed;
-    }
+    return localStorage.getItem(CURRENT_KEY);
   } catch {
-    // fall through to seed
-  }
-  return SEED_PROJECTS;
-}
-
-function readCurrentId(projects: Project[]): string | null {
-  try {
-    const stored = localStorage.getItem(CURRENT_KEY);
-    if (stored && projects.some((p) => p.id === stored)) return stored;
-  } catch {
-    // fall through
-  }
-  return null;
-}
-
-function persistProjects(projects: Project[]) {
-  try {
-    localStorage.setItem(PROJECTS_KEY, JSON.stringify(projects));
-  } catch {
-    // ignore
+    return null;
   }
 }
 
-function persistCurrentId(id: string | null) {
+function persistCurrentId(id: string) {
   try {
-    if (id) localStorage.setItem(CURRENT_KEY, id);
-    else localStorage.removeItem(CURRENT_KEY);
+    localStorage.setItem(CURRENT_KEY, id);
   } catch {
-    // ignore
+    // per-viewer convenience only
   }
 }
 
 export function ProjectsProvider({ children }: { children: ReactNode }) {
-  const [projects, setProjects] = useState<Project[]>(readProjects);
-  const [currentProjectId, setCurrentProjectId] = useState<string | null>(() => readCurrentId(readProjects()));
+  const { user } = useAuth();
+  const userId = user?.id ?? null;
+  const [projects, setProjects] = useState<Project[]>([]);
+  const [loadedFor, setLoadedFor] = useState<string | null>(null);
+  const [error, setError] = useState<string | null>(null);
+  const [currentProjectId, setCurrentProjectId] = useState<string | null>(readCurrentId);
 
-  function selectProject(id: string) {
+  const reload = useCallback(async () => {
+    if (!userId) return;
+    try {
+      const loaded = await fetchProjects();
+      setProjects(loaded);
+      setError(null);
+    } catch (e) {
+      setError(e instanceof Error ? e.message : String(e));
+    } finally {
+      setLoadedFor(userId);
+    }
+  }, [userId]);
+
+  useEffect(() => {
+    if (!userId) {
+      // Signed out: never leave one user's projects on screen for the next one.
+      setProjects([]);
+      setLoadedFor(null);
+      setError(null);
+      return;
+    }
+    void reload();
+  }, [userId, reload]);
+
+  const selectProject = useCallback((id: string) => {
     setCurrentProjectId(id);
     persistCurrentId(id);
-  }
+  }, []);
 
-  function createProject(name: string): Project {
-    const project: Project = { id: crypto.randomUUID(), name };
-    const next = [...projects, project];
-    setProjects(next);
-    persistProjects(next);
-    selectProject(project.id);
-    return project;
-  }
+  const createProject = useCallback(
+    async (name: string) => {
+      const project = await apiCreateProject(name);
+      setProjects((prev) => [...prev, project]);
+      selectProject(project.id);
+      return project;
+    },
+    [selectProject]
+  );
 
   const currentProject = projects.find((p) => p.id === currentProjectId) ?? null;
+  const loading = userId !== null && loadedFor !== userId;
 
   return (
     <ProjectsContext.Provider
-      value={{ projects, currentProjectId, currentProject, selectProject, createProject }}
+      value={{ projects, loading, error, currentProjectId, currentProject, selectProject, createProject, reload }}
     >
       {children}
     </ProjectsContext.Provider>

@@ -30,14 +30,18 @@ export default function ProjectSwitcher({ expanded }: ProjectSwitcherProps) {
     setOpen(false);
   }
 
-  function handleCreate() {
+  async function handleCreate() {
     const name = newName.trim();
     if (!name) return;
-    const project = createProject(name);
-    navigate(`/p/${project.id}/search`);
-    setNewName("");
-    setCreating(false);
-    setOpen(false);
+    try {
+      const project = await createProject(name);
+      navigate(`/p/${project.id}/search`);
+      setNewName("");
+      setCreating(false);
+      setOpen(false);
+    } catch {
+      // keep the form open with the typed name so the user can simply try again
+    }
   }
 
   const otherProjects = projects.filter((p) => p.id !== currentProject?.id);
