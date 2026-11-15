@@ -1,6 +1,7 @@
 import { useLanguage } from "../i18n/LanguageContext";
 import { Icon } from "../icons";
 import UserMenu from "./UserMenu";
+import EnvironmentSwitcher from "./EnvironmentSwitcher";
 import type { SidebarState } from "./useSidebarState";
 
 interface TopBarProps {
@@ -36,6 +37,7 @@ export default function TopBar({ sidebarState, onShowSidebar }: TopBarProps) {
         </div>
 
         <div className="flex items-center gap-space-md">
+          <EnvironmentSwitcher />
           <button
             className="flex items-center gap-space-xs px-space-sm py-1 rounded-xl bg-surface-container hover:bg-surface-container-high text-on-surface font-code text-code-sm transition-colors"
             onClick={toggleLang}

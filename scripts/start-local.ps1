@@ -2,17 +2,31 @@
 .SYNOPSIS
   Builds and starts all 7 MoSes services locally, each in its own tab of a single
   Windows Terminal window (or its own PowerShell window if Windows Terminal is missing).
-  Requires: Java 21, Maven, Node.js, and MongoDB reachable at localhost:27017.
+  Requires: Java 21, Maven, Node.js, and MongoDB - either reachable at localhost:27017,
+  or an external one given in the MONGODB_URI environment variable.
 #>
 
 $ErrorActionPreference = "Stop"
 $root = Split-Path -Parent $PSScriptRoot
 
-Write-Host "==> Checking MongoDB on localhost:27017..." -ForegroundColor Cyan
-$mongoUp = Test-NetConnection -ComputerName localhost -Port 27017 -WarningAction SilentlyContinue
-if (-not $mongoUp.TcpTestSucceeded) {
-    Write-Host "MongoDB is not reachable on localhost:27017. Start it first (e.g. 'mongod')." -ForegroundColor Red
-    exit 1
+# MONGODB_URI (optional) points the services at an external database such as the MongoDB Atlas
+# cluster the Render deployment used. Without it every service falls back to its default,
+# mongodb://localhost:27017/moses_monitor - a separate, local-only data set.
+# Set it for this shell ($env:MONGODB_URI = '...') or permanently as a user environment variable.
+$mongoUri = $env:MONGODB_URI
+if (-not $mongoUri) { $mongoUri = [Environment]::GetEnvironmentVariable("MONGODB_URI", "User") }
+
+if ($mongoUri) {
+    # The URI holds credentials, so it is never printed.
+    Write-Host "==> Using the external MongoDB from MONGODB_URI (not localhost)." -ForegroundColor Cyan
+}
+else {
+    Write-Host "==> Checking MongoDB on localhost:27017..." -ForegroundColor Cyan
+    $mongoUp = Test-NetConnection -ComputerName localhost -Port 27017 -WarningAction SilentlyContinue
+    if (-not $mongoUp.TcpTestSucceeded) {
+        Write-Host "MongoDB is not reachable on localhost:27017. Start it first (e.g. 'mongod')." -ForegroundColor Red
+        exit 1
+    }
 }
 
 Write-Host "==> Building all Java modules (mvn package -DskipTests)..." -ForegroundColor Cyan
@@ -40,10 +54,14 @@ if (-not (Test-Path "$root\frontend\.env.local")) {
 
 # One entry per tab: title, working directory, and the command to run in it.
 $quotedSecret = $env:JWT_SECRET.Replace("'", "''")
+# JWT_SECRET (and MONGODB_URI, when given) are set inside the tab itself: a tab opened by an
+# already-running Windows Terminal does not reliably inherit this script's environment.
+$tabEnv = "`$env:JWT_SECRET = '$quotedSecret'; "
+if ($mongoUri) {
+    $tabEnv += "`$env:MONGODB_URI = '$($mongoUri.Replace("'", "''"))'; "
+}
 $tabs = foreach ($name in "ingestion-service", "search-service", "process-monitor-service", "ai-service", "auth-service", "api-gateway") {
-    # JWT_SECRET is set inside the tab itself: a tab opened by an already-running
-    # Windows Terminal does not reliably inherit this script's environment.
-    @{ Title = $name; Dir = $root; Command = "`$env:JWT_SECRET = '$quotedSecret'; java -jar '$root\$name\target\$name.jar'" }
+    @{ Title = $name; Dir = $root; Command = "${tabEnv}java -jar '$root\$name\target\$name.jar'" }
 }
 $tabs += @{ Title = "frontend"; Dir = "$root\frontend"; Command = "npm run dev" }
 

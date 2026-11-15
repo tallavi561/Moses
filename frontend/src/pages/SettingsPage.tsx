@@ -2,6 +2,7 @@ import { useLanguage } from "../i18n/LanguageContext";
 import { useTheme } from "../theme/ThemeContext";
 import { Icon } from "../icons";
 import TeamSettings from "../components/TeamSettings";
+import EnvironmentSettings from "../components/EnvironmentSettings";
 
 export default function SettingsPage() {
   const { t } = useLanguage();
@@ -40,6 +41,8 @@ export default function SettingsPage() {
       </div>
 
       <TeamSettings />
+
+      <EnvironmentSettings />
 
       <div className="bg-surface-container-low rounded-2xl shadow-sm p-space-lg">
         <h2 className="font-headline text-headline-md text-on-surface">{t.settings.integrationTitle}</h2>

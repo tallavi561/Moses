@@ -1,4 +1,4 @@
-import { useEffect } from "react";
+import { Fragment, useEffect } from "react";
 import { Navigate, Outlet, useParams } from "react-router-dom";
 import Sidebar from "./Sidebar";
 import TopBar from "./TopBar";
@@ -14,7 +14,7 @@ const OFFSET: Record<string, string> = {
 export default function Layout() {
   const sidebar = useSidebarState();
   const { projectId } = useParams<{ projectId: string }>();
-  const { projects, loading, selectProject } = useProjects();
+  const { projects, loading, selectProject, currentProjectId, currentEnvironment } = useProjects();
   const projectExists = projects.some((p) => p.id === projectId);
 
   useEffect(() => {
@@ -37,7 +37,14 @@ export default function Layout() {
         <TopBar sidebarState={sidebar.state} onShowSidebar={sidebar.show} />
         <main className="w-full pt-16 min-h-screen">
           <div className="max-w-[1400px] mx-auto px-space-md py-space-md flex flex-col gap-space-md">
-            <Outlet />
+            {/* Only once the URL's project is the current one (so requests carry its scope), and
+                remounted when the project or environment changes: every page loads its data on
+                mount, and none of it carries over to another project or environment. */}
+            {currentProjectId === projectId && (
+              <Fragment key={`${projectId}:${currentEnvironment}`}>
+                <Outlet />
+              </Fragment>
+            )}
           </div>
         </main>
       </div>

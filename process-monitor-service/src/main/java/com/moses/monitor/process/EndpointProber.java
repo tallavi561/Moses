@@ -45,6 +45,8 @@ public class EndpointProber {
     @Scheduled(fixedDelayString = "${moses.prober.interval-ms}")
     public void probeAll() {
         List<ProcessState> targets = mongoTemplate.findAll(ProcessState.class).stream()
+                // No project: a leftover from before services had an owner; nobody can see it.
+                .filter(s -> s.getProjectId() != null)
                 .filter(s -> s.getProbeUrl() != null && !s.getProbeUrl().isBlank())
                 .toList();
         if (targets.isEmpty()) {
@@ -91,7 +93,7 @@ public class EndpointProber {
                 ? ProcessStatus.UP
                 : ProcessStatus.DOWN;
 
-        ProcessState current = mongoTemplate.findById(target.getServiceName(), ProcessState.class);
+        ProcessState current = mongoTemplate.findById(target.getId(), ProcessState.class);
         if (current == null) {
             return;
         }

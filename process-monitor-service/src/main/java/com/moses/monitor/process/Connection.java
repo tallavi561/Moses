@@ -1,5 +1,6 @@
 package com.moses.monitor.process;
 
+import com.fasterxml.jackson.annotation.JsonIgnore;
 import org.springframework.data.annotation.Id;
 import org.springframework.data.mongodb.core.mapping.Document;
 import org.springframework.data.mongodb.core.mapping.Field;
@@ -15,6 +16,11 @@ public class Connection {
 
     @Id
     private String id;
+
+    /** Connections describe the project's architecture, so they are shared by its environments. */
+    @JsonIgnore
+    @Field("project_id")
+    private String projectId;
 
     @Field("source_service")
     private String sourceService;
@@ -40,6 +46,14 @@ public class Connection {
 
     public void setId(String id) {
         this.id = id;
+    }
+
+    public String getProjectId() {
+        return projectId;
+    }
+
+    public void setProjectId(String projectId) {
+        this.projectId = projectId;
     }
 
     public String getSourceService() {

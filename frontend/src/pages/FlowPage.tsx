@@ -111,7 +111,7 @@ function FlowNodeCard({ state, t }: { state: ProcessState; t: ReturnType<typeof 
 
 export default function FlowPage() {
   const { t } = useLanguage();
-  const { currentProjectId } = useProjects();
+  const { currentProjectId, canEdit } = useProjects();
   const positionsKey = `moses.flow.positions.${currentProjectId ?? "default"}`;
   const viewKey = `moses.flow.view.${currentProjectId ?? "default"}`;
 
@@ -280,12 +280,12 @@ export default function FlowPage() {
 
   function handleNodeClick(_event: unknown, node: Node) {
     const state = states.find((s) => s.serviceName === node.id);
-    if (state) setEditingNode(state);
+    if (state && canEdit) setEditingNode(state);
   }
 
   function handleEdgeClick(_event: unknown, edge: Edge) {
     const connection = connections.find((c) => c.id === edge.id);
-    if (connection) setEditingConnection(connection);
+    if (connection && canEdit) setEditingConnection(connection);
   }
 
   const upCount = states.filter((s) => s.status === "UP").length;
@@ -373,10 +373,11 @@ export default function FlowPage() {
         </div>
       </div>
 
-      <AddServiceForm existingServices={states.map((s) => s.serviceName)} onAdd={handleAddService} />
+      {/* A viewer can look at the architecture but not change it (the server refuses it too). */}
+      {canEdit && <AddServiceForm existingServices={states.map((s) => s.serviceName)} onAdd={handleAddService} />}
 
       <div className="bg-surface-container-lowest rounded-2xl shadow-sm p-space-md flex flex-col gap-space-sm">
-        {view === "graph" && (
+        {view === "graph" && canEdit && (
           <p className="flex items-center gap-1 font-body-sm text-body-sm text-on-surface-variant">
             <Icon name="info" size={15} />
             {t.flow.editNodeHint}
@@ -427,8 +428,8 @@ export default function FlowPage() {
           <ArchitectureListView
             states={states}
             connections={connections}
-            onEditNode={setEditingNode}
-            onEditConnection={setEditingConnection}
+            onEditNode={(node) => canEdit && setEditingNode(node)}
+            onEditConnection={(connection) => canEdit && setEditingConnection(connection)}
           />
         )}
 

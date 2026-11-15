@@ -11,17 +11,24 @@ import java.util.HashSet;
 import java.util.Set;
 
 /**
- * One document per (word, time bucket) pair. log_ids accumulate via upsert
+ * One document per (scope, word, time bucket). log_ids accumulate via upsert
  * so the array never grows unbounded for the lifetime of the index.
+ *
+ * The scope is one environment of one project ({@link #scopeOf}): each has its own index, so a
+ * search never even looks at another project's words. The index itself is created by
+ * ingestion-service's RetentionIndexInitializer (auto-index-creation is off there).
  */
 @Document(collection = "index_buckets")
 @CompoundIndexes({
-        @CompoundIndex(name = "word_bucket_unique", def = "{'word': 1, 'bucket': 1}", unique = true)
+        @CompoundIndex(name = "scope_word_bucket_unique", def = "{'scope': 1, 'word': 1, 'bucket': 1}", unique = true)
 })
 public class IndexBucket {
 
     @Id
     private String id;
+
+    @Field("scope")
+    private String scope;
 
     @Field("word")
     private String word;
@@ -40,7 +47,8 @@ public class IndexBucket {
     public IndexBucket() {
     }
 
-    public IndexBucket(String word, String bucket, Instant bucketStart) {
+    public IndexBucket(String scope, String word, String bucket, Instant bucketStart) {
+        this.scope = scope;
         this.word = word;
         this.bucket = bucket;
         this.bucketStart = bucketStart;
@@ -52,6 +60,18 @@ public class IndexBucket {
 
     public void setId(String id) {
         this.id = id;
+    }
+
+    public static String scopeOf(String projectId, String environment) {
+        return projectId + "|" + environment;
+    }
+
+    public String getScope() {
+        return scope;
+    }
+
+    public void setScope(String scope) {
+        this.scope = scope;
     }
 
     public String getWord() {

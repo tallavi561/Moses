@@ -44,7 +44,7 @@ public class RouteConfig {
      * (unlike the "http://host:port" local defaults), which would otherwise be misparsed as a URI
      * whose scheme is the hostname.
      */
-    private static String normalize(String url) {
+    static String normalize(String url) {
         if (url == null || url.isBlank() || url.startsWith("http://") || url.startsWith("https://")) {
             return url;
         }

@@ -6,6 +6,7 @@ import com.moses.monitor.search.SearchQuery;
 import com.moses.monitor.search.SearchService;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
+import org.springframework.web.bind.annotation.RequestHeader;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
@@ -24,23 +25,30 @@ public class SearchController {
     }
 
     @GetMapping
-    public List<LogEntry> search(@RequestParam(required = false) List<String> words,
+    public List<LogEntry> search(@RequestHeader("X-Moses-Project-Id") String projectId,
+                                  @RequestHeader("X-Moses-Environment") String environment,
+                                  @RequestParam(required = false) List<String> words,
                                   @RequestParam Instant from,
                                   @RequestParam Instant to,
                                   @RequestParam(required = false) Integer logLevel,
                                   @RequestParam(required = false) String service,
                                   @RequestParam(required = false) String traceId) {
-        return searchService.search(new SearchQuery(words, from, to, logLevel, service, traceId));
+        return searchService.search(
+                new SearchQuery(projectId, environment, words, from, to, logLevel, service, traceId));
     }
 
     /** Everything that happened for one request (traceId), across services, oldest first. */
     @GetMapping("/trace/{traceId}")
-    public List<LogEntry> trace(@PathVariable String traceId) {
-        return searchService.trace(traceId);
+    public List<LogEntry> trace(@RequestHeader("X-Moses-Project-Id") String projectId,
+                                @RequestHeader("X-Moses-Environment") String environment,
+                                @PathVariable String traceId) {
+        return searchService.trace(projectId, environment, traceId);
     }
 
     @GetMapping("/page")
-    public LogPage searchPage(@RequestParam(required = false) List<String> words,
+    public LogPage searchPage(@RequestHeader("X-Moses-Project-Id") String projectId,
+                               @RequestHeader("X-Moses-Environment") String environment,
+                               @RequestParam(required = false) List<String> words,
                                @RequestParam Instant from,
                                @RequestParam Instant to,
                                @RequestParam(required = false) Integer logLevel,
@@ -50,7 +58,8 @@ public class SearchController {
                                @RequestParam(required = false) String beforeId,
                                @RequestParam(defaultValue = "100") int limit) {
         int boundedLimit = Math.max(1, Math.min(limit, 200));
-        return searchService.searchPage(new SearchQuery(words, from, to, logLevel, service, traceId),
+        return searchService.searchPage(
+                new SearchQuery(projectId, environment, words, from, to, logLevel, service, traceId),
                 before, beforeId, boundedLimit);
     }
 }

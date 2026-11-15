@@ -3,6 +3,7 @@ package com.moses.monitor.auth;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.validation.Valid;
 import jakarta.validation.constraints.NotBlank;
+import jakarta.validation.constraints.NotNull;
 import jakarta.validation.constraints.Size;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.data.domain.Sort;
@@ -11,9 +12,11 @@ import org.springframework.data.mongodb.core.query.Criteria;
 import org.springframework.data.mongodb.core.query.Query;
 import org.springframework.data.mongodb.core.query.Update;
 import org.springframework.http.HttpStatus;
+import org.springframework.web.bind.annotation.DeleteMapping;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
+import org.springframework.web.bind.annotation.PutMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RestController;
 import org.springframework.web.server.ResponseStatusException;
@@ -36,11 +39,15 @@ public class ProjectController {
 
     public record CreateProjectRequest(@NotBlank @Size(max = 80) String name) { }
 
-    public record AddMemberRequest(@NotBlank String email) { }
+    /** {@code role} is optional; a new member is an EDITOR unless the owner says otherwise. */
+    public record AddMemberRequest(@NotBlank String email, Project.Role role) { }
 
-    public record ProjectView(String id, String name, Project.Role role, int memberCount) {
+    public record ChangeRoleRequest(@NotNull Project.Role role) { }
+
+    public record ProjectView(String id, String name, Project.Role role, int memberCount, List<String> environments) {
         static ProjectView of(Project project, String userId) {
-            return new ProjectView(project.getId(), project.getName(), project.roleOf(userId), project.getMembers().size());
+            return new ProjectView(project.getId(), project.getName(), project.roleOf(userId),
+                    project.getMembers().size(), project.getEnvironments());
         }
     }
 
@@ -54,12 +61,14 @@ public class ProjectController {
 
     private final MongoTemplate mongoTemplate;
     private final CurrentUser currentUser;
+    private final ProjectGuard guard;
     private final Duration inviteTtl;
 
-    public ProjectController(MongoTemplate mongoTemplate, CurrentUser currentUser,
+    public ProjectController(MongoTemplate mongoTemplate, CurrentUser currentUser, ProjectGuard guard,
                              @Value("${moses.invites.ttl-days}") long inviteTtlDays) {
         this.mongoTemplate = mongoTemplate;
         this.currentUser = currentUser;
+        this.guard = guard;
         this.inviteTtl = Duration.ofDays(inviteTtlDays);
     }
 
@@ -80,6 +89,7 @@ public class ProjectController {
         project.setName(body.name().trim());
         project.setCreatedAt(Instant.now());
         project.getMembers().add(new Project.Member(user.getId(), Project.Role.OWNER));
+        project.setEnvironments(new java.util.ArrayList<>(List.of(Project.DEFAULT_ENVIRONMENT)));
         mongoTemplate.insert(project);
         return ProjectView.of(project, user.getId());
     }
@@ -87,28 +97,50 @@ public class ProjectController {
     @GetMapping("/api/projects/{projectId}/members")
     public List<MemberView> members(HttpServletRequest request, @PathVariable String projectId) {
         User user = currentUser.require(request);
-        return memberViews(requireMembership(projectId, user));
+        return memberViews(guard.requireMembership(projectId, user));
     }
 
     @PostMapping("/api/projects/{projectId}/members")
     public List<MemberView> addMember(HttpServletRequest request, @PathVariable String projectId,
                                       @Valid @RequestBody AddMemberRequest body) {
         User user = currentUser.require(request);
-        requireOwner(projectId, user);
+        guard.requireOwner(projectId, user);
 
         User added = mongoTemplate.findOne(
                 new Query(Criteria.where("email").is(AuthController.normalizeEmail(body.email()))), User.class);
         if (added == null) {
             throw new ResponseStatusException(HttpStatus.NOT_FOUND, "no account with this email");
         }
-        join(projectId, added.getId());
-        return memberViews(requireMembership(projectId, user));
+        join(projectId, added.getId(), assignable(body.role() == null ? Project.Role.EDITOR : body.role()));
+        return memberViews(guard.requireMembership(projectId, user));
+    }
+
+    @PutMapping("/api/projects/{projectId}/members/{memberId}")
+    public List<MemberView> changeRole(HttpServletRequest request, @PathVariable String projectId,
+                                       @PathVariable String memberId, @Valid @RequestBody ChangeRoleRequest body) {
+        User user = currentUser.require(request);
+        requireOtherMember(guard.requireOwner(projectId, user), memberId);
+
+        Query member = new Query(Criteria.where("_id").is(projectId).and("members.user_id").is(memberId));
+        mongoTemplate.updateFirst(member, new Update().set("members.$.role", assignable(body.role())), Project.class);
+        return memberViews(guard.requireMembership(projectId, user));
+    }
+
+    @DeleteMapping("/api/projects/{projectId}/members/{memberId}")
+    public List<MemberView> removeMember(HttpServletRequest request, @PathVariable String projectId,
+                                         @PathVariable String memberId) {
+        User user = currentUser.require(request);
+        requireOtherMember(guard.requireOwner(projectId, user), memberId);
+
+        Update remove = new Update().pull("members", Query.query(Criteria.where("user_id").is(memberId)));
+        mongoTemplate.updateFirst(new Query(Criteria.where("_id").is(projectId)), remove, Project.class);
+        return memberViews(guard.requireMembership(projectId, user));
     }
 
     @PostMapping("/api/projects/{projectId}/invites")
     public InviteView createInvite(HttpServletRequest request, @PathVariable String projectId) {
         User user = currentUser.require(request);
-        requireOwner(projectId, user);
+        guard.requireOwner(projectId, user);
 
         byte[] bytes = new byte[32];
         RANDOM.nextBytes(bytes);
@@ -133,7 +165,7 @@ public class ProjectController {
     public ProjectView acceptInvite(HttpServletRequest request, @PathVariable String token) {
         User user = currentUser.require(request);
         ProjectInvite invite = requireInvite(token);
-        join(invite.getProjectId(), user.getId());
+        join(invite.getProjectId(), user.getId(), Project.Role.EDITOR);
         return ProjectView.of(requireInvitedProject(invite), user.getId());
     }
 
@@ -146,16 +178,35 @@ public class ProjectController {
                 .filter(m -> users.containsKey(m.getUserId()))
                 .map(m -> {
                     User u = users.get(m.getUserId());
-                    return new MemberView(u.getId(), u.getName(), u.getEmail(), m.getRole(), m.getJoinedAt());
+                    return new MemberView(u.getId(), u.getName(), u.getEmail(), project.roleOf(u.getId()), m.getJoinedAt());
                 })
                 .toList();
     }
 
-    /** Adds the user as a MEMBER unless already in the project (atomic, so no duplicate entries). */
-    private void join(String projectId, String userId) {
+    /** Adds the user with the given role unless already in the project (atomic, so no duplicate entries). */
+    private void join(String projectId, String userId, Project.Role role) {
         Query notYetMember = new Query(Criteria.where("_id").is(projectId).and("members.user_id").ne(userId));
-        Update add = new Update().push("members", new Project.Member(userId, Project.Role.MEMBER));
+        Update add = new Update().push("members", new Project.Member(userId, role));
         mongoTemplate.updateFirst(notYetMember, add, Project.class);
+    }
+
+    /** The roles an owner can hand out. A project keeps the one owner who created it. */
+    private static Project.Role assignable(Project.Role role) {
+        if (role != Project.Role.EDITOR && role != Project.Role.VIEWER) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "role must be EDITOR or VIEWER");
+        }
+        return role;
+    }
+
+    /** The target of a role change or removal: someone in the project who is not its owner. */
+    private static void requireOtherMember(Project project, String memberId) {
+        Project.Role role = project.roleOf(memberId);
+        if (role == null) {
+            throw new ResponseStatusException(HttpStatus.NOT_FOUND, "member not found");
+        }
+        if (role == Project.Role.OWNER) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "the owner's membership cannot be changed");
+        }
     }
 
     private ProjectInvite requireInvite(String token) {
@@ -173,21 +224,5 @@ public class ProjectController {
             throw new ResponseStatusException(HttpStatus.NOT_FOUND, "invite not found or expired");
         }
         return project;
-    }
-
-    /** 404 (not 403) for a project the user isn't in, so project ids can't be probed. */
-    private Project requireMembership(String projectId, User user) {
-        Project project = mongoTemplate.findById(projectId, Project.class);
-        if (project == null || project.roleOf(user.getId()) == null) {
-            throw new ResponseStatusException(HttpStatus.NOT_FOUND, "project not found");
-        }
-        return project;
-    }
-
-    private void requireOwner(String projectId, User user) {
-        Project project = requireMembership(projectId, user);
-        if (project.roleOf(user.getId()) != Project.Role.OWNER) {
-            throw new ResponseStatusException(HttpStatus.FORBIDDEN, "only the project owner can do this");
-        }
     }
 }

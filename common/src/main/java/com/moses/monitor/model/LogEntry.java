@@ -12,6 +12,16 @@ public class LogEntry {
     @Id
     private String logId;
 
+    /**
+     * The owner of the log: the project, and the environment of it, whose API key sent it.
+     * Every search is restricted to one such pair.
+     */
+    @Field("project_id")
+    private String projectId;
+
+    @Field("environment")
+    private String environment;
+
     @Field("timestamp")
     private Instant timestamp;
 
@@ -60,6 +70,22 @@ public class LogEntry {
 
     public void setLogId(String logId) {
         this.logId = logId;
+    }
+
+    public String getProjectId() {
+        return projectId;
+    }
+
+    public void setProjectId(String projectId) {
+        this.projectId = projectId;
+    }
+
+    public String getEnvironment() {
+        return environment;
+    }
+
+    public void setEnvironment(String environment) {
+        this.environment = environment;
     }
 
     public Instant getTimestamp() {

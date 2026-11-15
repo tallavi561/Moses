@@ -66,7 +66,7 @@ public class SearchService {
             return List.of();
         }
 
-        Set<String> candidateIds = resolveCandidateIds(query.getWords(), bucketKeys);
+        Set<String> candidateIds = resolveCandidateIds(query, bucketKeys);
         if (candidateIds.isEmpty()) {
             return List.of();
         }
@@ -89,14 +89,15 @@ public class SearchService {
      * round trip over up to one key per time bucket), then intersects them starting from the
      * smallest set so the work is bounded by the rarest word, not the most common one.
      */
-    private Set<String> resolveCandidateIds(List<String> rawWords, List<String> bucketKeys) {
+    private Set<String> resolveCandidateIds(SearchQuery query, List<String> bucketKeys) {
         long start = System.nanoTime();
-        List<String> words = rawWords.stream().map(this::normalize).distinct().toList();
+        List<String> words = query.getWords().stream().map(this::normalize).distinct().toList();
+        String scope = IndexBucket.scopeOf(query.getProjectId(), query.getEnvironment());
 
         List<Set<String>> idSets;
         try (ExecutorService executor = Executors.newVirtualThreadPerTaskExecutor()) {
             List<Future<Set<String>>> futures = words.stream()
-                    .map(word -> executor.submit(() -> idsForWordInBuckets(word, bucketKeys)))
+                    .map(word -> executor.submit(() -> idsForWordInBuckets(scope, word, bucketKeys)))
                     .toList();
             idSets = new ArrayList<>();
             for (Future<Set<String>> future : futures) {
@@ -134,13 +135,14 @@ public class SearchService {
             if (bucketKeys.isEmpty()) {
                 return new LogPage(List.of(), false);
             }
-            candidateIds = resolveCandidateIds(query.getWords(), bucketKeys);
+            candidateIds = resolveCandidateIds(query, bucketKeys);
             if (candidateIds.isEmpty()) {
                 return new LogPage(List.of(), false);
             }
         }
 
         List<Criteria> conditions = new ArrayList<>();
+        conditions.add(inScope(query.getProjectId(), query.getEnvironment()));
         conditions.add(Criteria.where("timestamp").gte(query.getFrom()).lte(query.getTo()));
         if (candidateIds != null) {
             conditions.add(Criteria.where("_id").in(candidateIds));
@@ -178,11 +180,12 @@ public class SearchService {
     }
 
     /**
-     * Every log of one trace, oldest first, across all services and without a time window
-     * (a trace is identified by its id alone; retention bounds how far back it can reach).
+     * Every log of one trace, oldest first, across all services of the environment and without
+     * a time window (a trace is identified by its id alone; retention bounds how far back it
+     * can reach).
      */
-    public List<LogEntry> trace(String traceId) {
-        Query query = new Query(Criteria.where("trace_id").is(traceId))
+    public List<LogEntry> trace(String projectId, String environment, String traceId) {
+        Query query = new Query(inScope(projectId, environment).and("trace_id").is(traceId))
                 .with(org.springframework.data.domain.Sort.by(
                         org.springframework.data.domain.Sort.Order.asc("timestamp"),
                         org.springframework.data.domain.Sort.Order.asc("_id")))
@@ -198,8 +201,13 @@ public class SearchService {
         return tokens.isEmpty() ? "" : tokens.get(0);
     }
 
-    private Set<String> idsForWordInBuckets(String word, List<String> bucketKeys) {
-        Query q = Query.query(Criteria.where("word").is(word).and("bucket").in(bucketKeys));
+    /** Every query on logs starts here: only this environment of this project. */
+    private static Criteria inScope(String projectId, String environment) {
+        return Criteria.where("project_id").is(projectId).and("environment").is(environment);
+    }
+
+    private Set<String> idsForWordInBuckets(String scope, String word, List<String> bucketKeys) {
+        Query q = Query.query(Criteria.where("scope").is(scope).and("word").is(word).and("bucket").in(bucketKeys));
         q.fields().include("log_ids");
         List<IndexBucket> buckets = mongoTemplate.find(q, IndexBucket.class);
 
@@ -211,7 +219,8 @@ public class SearchService {
     }
 
     private List<LogEntry> fetchAndMicroFilter(Set<String> candidateIds, SearchQuery query) {
-        Criteria criteria = Criteria.where("timestamp").gte(query.getFrom()).lte(query.getTo());
+        Criteria criteria = inScope(query.getProjectId(), query.getEnvironment())
+                .and("timestamp").gte(query.getFrom()).lte(query.getTo());
         if (candidateIds != null) {
             criteria = criteria.and("_id").in(candidateIds);
         }

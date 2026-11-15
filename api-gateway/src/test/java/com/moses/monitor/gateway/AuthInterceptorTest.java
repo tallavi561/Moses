@@ -15,9 +15,41 @@ class AuthInterceptorTest {
     }
 
     @Test
-    void monitoredServicesCanStillReportIn() {
-        assertTrue(AuthInterceptor.isPublic("POST", "/api/logs"));
-        assertTrue(AuthInterceptor.isPublic("POST", "/api/process/heartbeat"));
+    void reportingInIsNoLongerOpen() {
+        assertFalse(AuthInterceptor.isPublic("POST", "/api/logs"));
+        assertFalse(AuthInterceptor.isPublic("POST", "/api/process/heartbeat"));
+    }
+
+    @Test
+    void monitoringDataIsScopedAndAccountsAreNot() {
+        assertTrue(AuthInterceptor.isScoped("/api/logs"));
+        assertTrue(AuthInterceptor.isScoped("/api/search/page"));
+        assertTrue(AuthInterceptor.isScoped("/api/process/state"));
+        assertTrue(AuthInterceptor.isScoped("/api/ai/query"));
+        assertFalse(AuthInterceptor.isScoped("/api/projects"));
+        assertFalse(AuthInterceptor.isScoped("/api/auth/me"));
+        assertFalse(AuthInterceptor.isScoped("/api/processes"));
+    }
+
+    @Test
+    void anApiKeyOnlySendsLogsAndHeartbeats() {
+        assertTrue(AuthInterceptor.acceptsApiKey("POST", "/api/logs"));
+        assertTrue(AuthInterceptor.acceptsApiKey("POST", "/api/process/heartbeat"));
+        assertFalse(AuthInterceptor.acceptsApiKey("GET", "/api/process/state"));
+        assertFalse(AuthInterceptor.acceptsApiKey("GET", "/api/search/page"));
+        assertFalse(AuthInterceptor.acceptsApiKey("DELETE", "/api/process/nodes/x"));
+        assertFalse(AuthInterceptor.acceptsApiKey("POST", "/api/process/connections"));
+    }
+
+    @Test
+    void viewersAreStoppedOnChangesOnly() {
+        assertTrue(AuthInterceptor.isChange("POST", "/api/process/heartbeat"));
+        assertTrue(AuthInterceptor.isChange("PUT", "/api/process/nodes/x"));
+        assertTrue(AuthInterceptor.isChange("DELETE", "/api/process/connections/1"));
+        assertTrue(AuthInterceptor.isChange("POST", "/api/logs"));
+        assertFalse(AuthInterceptor.isChange("GET", "/api/process/state"));
+        assertFalse(AuthInterceptor.isChange("GET", "/api/search/page"));
+        assertFalse(AuthInterceptor.isChange("POST", "/api/ai/query"));
     }
 
     @Test

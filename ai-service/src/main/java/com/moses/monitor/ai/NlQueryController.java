@@ -2,8 +2,12 @@ package com.moses.monitor.ai;
 
 import jakarta.validation.constraints.NotBlank;
 import org.springframework.beans.factory.annotation.Value;
+import org.springframework.http.HttpEntity;
+import org.springframework.http.HttpHeaders;
+import org.springframework.http.HttpMethod;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
+import org.springframework.web.bind.annotation.RequestHeader;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
 import org.springframework.web.client.RestTemplate;
@@ -39,7 +43,9 @@ public class NlQueryController {
      * Results are newest first, at most {@link #RESULT_LIMIT}; {@code hasMore} says if there are more.
      */
     @PostMapping("/query")
-    public Object query(@RequestBody NlQueryRequest request) {
+    public Object query(@RequestHeader(ServiceCatalog.PROJECT_HEADER) String projectId,
+                        @RequestHeader(ServiceCatalog.ENVIRONMENT_HEADER) String environment,
+                        @RequestBody NlQueryRequest request) {
         TranslatedQuery translated = translator.translate(request.question());
 
         UriComponentsBuilder uri = UriComponentsBuilder
@@ -60,7 +66,13 @@ public class NlQueryController {
             uri.queryParam("traceId", translated.getTraceId());
         }
 
-        Map<?, ?> page = restTemplate.getForObject(uri.build().toUri(), Map.class);
+        // The question is answered from the asker's project and environment only: pass on the
+        // scope api-gateway established, so search-service applies it.
+        HttpHeaders scope = new HttpHeaders();
+        scope.set(ServiceCatalog.PROJECT_HEADER, projectId);
+        scope.set(ServiceCatalog.ENVIRONMENT_HEADER, environment);
+        Map<?, ?> page = restTemplate.exchange(uri.build().toUri(), HttpMethod.GET, new HttpEntity<>(scope), Map.class)
+                .getBody();
         Map<String, Object> response = new LinkedHashMap<>();
         response.put("interpretedAs", translated);
         response.put("results", page == null ? java.util.List.of() : page.get("logs"));

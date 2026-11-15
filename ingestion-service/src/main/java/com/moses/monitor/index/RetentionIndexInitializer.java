@@ -46,6 +46,33 @@ public class RetentionIndexInitializer {
         ensureTtlIndex(IndexBucket.class, BUCKETS_TTL_INDEX, "bucket_start", ttl);
         log.info("Retention TTL indexes ensured ({} days)", retentionDays);
         ensureTraceIdIndex();
+        ensureScopeIndexes();
+    }
+
+    /**
+     * Logs and the word index are per project environment. The word index used to be global,
+     * with a unique (word, bucket) index that would now reject a second project using the same
+     * word in the same hour - so that one goes, replaced by (scope, word, bucket).
+     */
+    private void ensureScopeIndexes() {
+        IndexOperations buckets = mongoTemplate.indexOps(IndexBucket.class);
+        boolean hasGlobalIndex = buckets.getIndexInfo().stream()
+                .anyMatch(info -> info.getName().equals("word_bucket_unique"));
+        if (hasGlobalIndex) {
+            buckets.dropIndex("word_bucket_unique");
+        }
+        buckets.ensureIndex(new Index()
+                .on("scope", org.springframework.data.domain.Sort.Direction.ASC)
+                .on("word", org.springframework.data.domain.Sort.Direction.ASC)
+                .on("bucket", org.springframework.data.domain.Sort.Direction.ASC)
+                .unique()
+                .named("scope_word_bucket_unique"));
+
+        mongoTemplate.indexOps(LogEntry.class).ensureIndex(new Index()
+                .on("project_id", org.springframework.data.domain.Sort.Direction.ASC)
+                .on("environment", org.springframework.data.domain.Sort.Direction.ASC)
+                .on("timestamp", org.springframework.data.domain.Sort.Direction.DESC)
+                .named("idx_logs_scope_timestamp"));
     }
 
     /** Lets "everything for this traceId" be an index lookup instead of a collection scan. */

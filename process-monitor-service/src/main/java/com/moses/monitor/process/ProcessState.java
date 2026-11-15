@@ -7,22 +7,26 @@ import org.springframework.data.mongodb.core.mapping.Field;
 import java.time.Instant;
 
 /**
- * Latest known state of one monitored node (service/process). One document
- * per serviceName, upserted on every heartbeat. This is what the React flow
- * diagram reads to draw nodes; edges come from the separate Connection
- * documents (see {@link Connection}).
+ * How one service is doing in one environment of its project: status, metrics, and the probe
+ * that may be watching it there. One document per (project, environment, service), upserted on
+ * every heartbeat. What the service is - its name and description - lives in
+ * {@link ServiceDefinition} and is shared by all environments; edges are {@link Connection}s.
  */
 @Document(collection = "process_state")
 public class ProcessState {
 
+    /** {@link #idOf}: the three parts of the key, so a heartbeat is a single-document upsert. */
     @Id
+    private String id;
+
+    @Field("project_id")
+    private String projectId;
+
+    @Field("environment")
+    private String environment;
+
+    @Field("service_name")
     private String serviceName;
-
-    @Field("process_name")
-    private String processName;
-
-    @Field("description")
-    private String description;
 
     @Field("status")
     private ProcessStatus status;
@@ -55,28 +59,51 @@ public class ProcessState {
     public ProcessState() {
     }
 
+    public ProcessState(String projectId, String environment, String serviceName) {
+        this.id = idOf(projectId, environment, serviceName);
+        this.projectId = projectId;
+        this.environment = environment;
+        this.serviceName = serviceName;
+    }
+
+    /**
+     * The document id. ingestion-service builds the same string to mark a service alive when
+     * its logs arrive (ServiceLivenessTracker) - keep the two in step.
+     */
+    public static String idOf(String projectId, String environment, String serviceName) {
+        return projectId + "|" + environment + "|" + serviceName;
+    }
+
+    public String getId() {
+        return id;
+    }
+
+    public void setId(String id) {
+        this.id = id;
+    }
+
+    public String getProjectId() {
+        return projectId;
+    }
+
+    public void setProjectId(String projectId) {
+        this.projectId = projectId;
+    }
+
+    public String getEnvironment() {
+        return environment;
+    }
+
+    public void setEnvironment(String environment) {
+        this.environment = environment;
+    }
+
     public String getServiceName() {
         return serviceName;
     }
 
     public void setServiceName(String serviceName) {
         this.serviceName = serviceName;
-    }
-
-    public String getProcessName() {
-        return processName;
-    }
-
-    public void setProcessName(String processName) {
-        this.processName = processName;
-    }
-
-    public String getDescription() {
-        return description;
-    }
-
-    public void setDescription(String description) {
-        this.description = description;
     }
 
     public ProcessStatus getStatus() {

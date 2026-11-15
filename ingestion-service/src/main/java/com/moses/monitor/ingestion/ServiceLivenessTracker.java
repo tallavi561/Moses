@@ -12,8 +12,9 @@ import java.util.List;
 import java.util.concurrent.ConcurrentHashMap;
 
 /**
- * A received log is proof the service is alive: refreshes last_seen on its node (and revives a
- * DOWN/UNKNOWN one to UP). Only touches nodes that already exist and have no probe URL - probed
+ * A received log is proof the service is alive in the environment it was sent from: refreshes
+ * last_seen on its node there (and revives a DOWN/UNKNOWN one to UP). Only touches nodes that
+ * already have a state in that environment and have no probe URL - probed
  * nodes are owned by the process-monitor's prober. Writes are throttled per service so a log
  * burst costs one update, not one per log.
  */
@@ -32,15 +33,17 @@ public class ServiceLivenessTracker {
         this.throttleMs = throttleSeconds * 1000;
     }
 
-    public void touch(String serviceName) {
+    public void touch(String projectId, String environment, String serviceName) {
+        // Same id process-monitor gives the state document (ProcessState.idOf) - keep in step.
+        String stateId = projectId + "|" + environment + "|" + serviceName;
         long now = System.currentTimeMillis();
-        Long previous = lastTouch.get(serviceName);
+        Long previous = lastTouch.get(stateId);
         if (previous != null && now - previous < throttleMs) {
             return;
         }
-        lastTouch.put(serviceName, now);
+        lastTouch.put(stateId, now);
 
-        Criteria unprobed = Criteria.where("_id").is(serviceName)
+        Criteria unprobed = Criteria.where("_id").is(stateId)
                 .and("probe_url").in(null, "");
 
         mongoTemplate.updateFirst(

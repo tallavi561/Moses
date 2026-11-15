@@ -1,6 +1,7 @@
 package com.moses.monitor.ingestion;
 
 import com.moses.monitor.index.BucketKeyUtil;
+import com.moses.monitor.model.IndexBucket;
 import com.moses.monitor.model.LogEntry;
 import com.moses.monitor.tokenize.Tokenizer;
 import org.bson.types.ObjectId;
@@ -41,11 +42,13 @@ public class IngestionService {
     }
 
     /** Accepts a log, returns its generated id immediately; indexing happens asynchronously. */
-    public String ingest(String serviceName, int logLevel, String ip, String rawMessage, Instant timestamp,
+    public String ingest(String projectId, String environment, String serviceName, int logLevel, String ip, String rawMessage, Instant timestamp,
                           String traceId, String spanId) {
         String logId = new ObjectId().toString();
         Instant effectiveTimestamp = timestamp != null ? timestamp : Instant.now();
         LogEntry entry = new LogEntry(logId, effectiveTimestamp, serviceName, logLevel, ip, rawMessage, traceId, spanId);
+        entry.setProjectId(projectId);
+        entry.setEnvironment(environment);
 
         ingestionExecutor.submit(() -> processAsync(entry));
         return logId;
@@ -54,13 +57,14 @@ public class IngestionService {
     private void processAsync(LogEntry entry) {
         try {
             mongoTemplate.save(entry);
-            livenessTracker.touch(entry.getServiceName());
+            livenessTracker.touch(entry.getProjectId(), entry.getEnvironment(), entry.getServiceName());
 
             List<String> words = tokenizer.tokenize(entry.getRawMessage());
             String bucketKey = BucketKeyUtil.bucketKey(entry.getTimestamp(), bucketGranularityMinutes);
             Instant bucketStart = BucketKeyUtil.floorToBucket(entry.getTimestamp(), bucketGranularityMinutes);
 
-            buffer.record(bucketKey, bucketStart, words, entry.getLogId());
+            String scope = IndexBucket.scopeOf(entry.getProjectId(), entry.getEnvironment());
+            buffer.record(scope, bucketKey, bucketStart, words, entry.getLogId());
         } catch (Exception e) {
             log.error("Failed to ingest log {}", entry.getLogId(), e);
         }

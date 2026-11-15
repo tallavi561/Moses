@@ -13,7 +13,18 @@ export class ApiError extends Error {
 }
 
 /**
- * fetch() plus the login token. A 401 on a request that carried a token means the session is
+ * The project and environment the user is working in. Every monitoring request (logs, search,
+ * architecture, AI) carries it, and the gateway refuses one that names a project the user is
+ * not in. Set by ProjectsProvider; null while no project is open.
+ */
+let apiScope: { projectId: string; environment: string } | null = null;
+
+export function setApiScope(scope: { projectId: string; environment: string } | null) {
+  apiScope = scope;
+}
+
+/**
+ * fetch() plus the login token and the current scope. A 401 on a request that carried a token means the session is
  * no longer valid (expired, or the account is gone), so it ends the session and the app falls
  * back to the sign-in screen.
  */
@@ -21,6 +32,10 @@ async function apiFetch(url: string, init: RequestInit = {}): Promise<Response> 
   const session = getSession();
   const headers = new Headers(init.headers);
   if (session) headers.set("Authorization", `Bearer ${session.token}`);
+  if (apiScope) {
+    headers.set("X-Project-Id", apiScope.projectId);
+    headers.set("X-Environment", apiScope.environment);
+  }
 
   const res = await fetch(url, { ...init, headers });
   if (res.status === 401 && session && getSession()?.token === session.token) {
@@ -58,13 +73,31 @@ export async function fetchMe(): Promise<SessionUser> {
 
 // ---- projects and their teams ----
 
-export type ProjectRole = "OWNER" | "MEMBER";
+/** OWNER manages the team, environments and keys; EDITOR changes monitoring data; VIEWER only reads. */
+export type ProjectRole = "OWNER" | "EDITOR" | "VIEWER";
+
+/** The roles an owner can give someone else. */
+export type AssignableRole = Exclude<ProjectRole, "OWNER">;
 
 export interface Project {
   id: string;
   name: string;
   role: ProjectRole;
   memberCount: number;
+  /** Never empty: a project always has at least one environment. */
+  environments: string[];
+}
+
+/** A key a monitored service reports in with. The key itself is only ever returned on creation. */
+export interface ApiKeyInfo {
+  id: string;
+  environment: string;
+  prefix: string;
+  createdAt: string;
+}
+
+export interface CreatedApiKey extends ApiKeyInfo {
+  key: string;
 }
 
 export interface ProjectMember {
@@ -99,9 +132,62 @@ export async function fetchMembers(projectId: string): Promise<ProjectMember[]> 
 }
 
 /** Adds an already-registered user by email; 404 means nobody has signed up with it. */
-export async function addMember(projectId: string, email: string): Promise<ProjectMember[]> {
-  const res = await postJson(`/api/projects/${encodeURIComponent(projectId)}/members`, { email });
+export async function addMember(projectId: string, email: string, role: AssignableRole): Promise<ProjectMember[]> {
+  const res = await postJson(`/api/projects/${encodeURIComponent(projectId)}/members`, { email, role });
   return (await expectOk(res, "Failed to add member")).json();
+}
+
+export async function changeMemberRole(
+  projectId: string,
+  userId: string,
+  role: AssignableRole
+): Promise<ProjectMember[]> {
+  const res = await apiFetch(
+    `${API_BASE_URL}/api/projects/${encodeURIComponent(projectId)}/members/${encodeURIComponent(userId)}`,
+    { method: "PUT", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ role }) }
+  );
+  return (await expectOk(res, "Failed to change role")).json();
+}
+
+export async function removeMember(projectId: string, userId: string): Promise<ProjectMember[]> {
+  const res = await apiFetch(
+    `${API_BASE_URL}/api/projects/${encodeURIComponent(projectId)}/members/${encodeURIComponent(userId)}`,
+    { method: "DELETE" }
+  );
+  return (await expectOk(res, "Failed to remove member")).json();
+}
+
+/** Returns the project's environments after the change. 409: the name is taken. */
+export async function addEnvironment(projectId: string, name: string): Promise<string[]> {
+  const res = await postJson(`/api/projects/${encodeURIComponent(projectId)}/environments`, { name });
+  return (await expectOk(res, "Failed to add environment")).json();
+}
+
+/** Also revokes the environment's keys. Its recorded data is not deleted, only unreachable. */
+export async function removeEnvironment(projectId: string, name: string): Promise<string[]> {
+  const res = await apiFetch(
+    `${API_BASE_URL}/api/projects/${encodeURIComponent(projectId)}/environments/${encodeURIComponent(name)}`,
+    { method: "DELETE" }
+  );
+  return (await expectOk(res, "Failed to remove environment")).json();
+}
+
+export async function fetchApiKeys(projectId: string): Promise<ApiKeyInfo[]> {
+  const res = await apiFetch(`${API_BASE_URL}/api/projects/${encodeURIComponent(projectId)}/keys`);
+  return (await expectOk(res, "Failed to load keys")).json();
+}
+
+export async function createApiKey(projectId: string, environment: string): Promise<CreatedApiKey> {
+  const res = await postJson(`/api/projects/${encodeURIComponent(projectId)}/keys`, { environment });
+  return (await expectOk(res, "Failed to create key")).json();
+}
+
+export async function revokeApiKey(projectId: string, keyId: string): Promise<ApiKeyInfo[]> {
+  const res = await apiFetch(
+    `${API_BASE_URL}/api/projects/${encodeURIComponent(projectId)}/keys/${encodeURIComponent(keyId)}`,
+    { method: "DELETE" }
+  );
+  return (await expectOk(res, "Failed to revoke key")).json();
 }
 
 export async function createInvite(projectId: string): Promise<ProjectInvite> {
@@ -139,7 +225,8 @@ export interface ProcessState {
   status: "UP" | "DEGRADED" | "DOWN" | "UNKNOWN";
   cpuPercent: number | null;
   memoryMb: number | null;
-  lastSeen: string;
+  /** Null when the service has never reported in the current environment. */
+  lastSeen: string | null;
   probeUrl: string | null;
   lastProbeAt: string | null;
   lastProbeStatusCode: number | null;

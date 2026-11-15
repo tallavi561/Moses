@@ -16,6 +16,8 @@ import java.util.Enumeration;
  * Generic reverse proxy: forwards every /api/** request to the backend
  * resolved by RouteConfig, relaying method, headers, query string and body
  * byte-for-byte, and relays the downstream status/headers/body back as-is.
+ * The one thing it adds: for monitoring requests, the project and environment that
+ * AuthInterceptor established, as X-Moses-Project-Id / X-Moses-Environment.
  */
 @RestController
 public class ProxyController {
@@ -51,7 +53,17 @@ public class ProxyController {
             if (name.equalsIgnoreCase(HttpHeaders.HOST) || name.equalsIgnoreCase(HttpHeaders.CONTENT_LENGTH)) {
                 continue;
             }
+            // The scope headers are set below from what AuthInterceptor verified - a caller must
+            // not be able to supply them. The API key has done its job by now and stays here.
+            String lower = name.toLowerCase();
+            if (lower.startsWith(SCOPE_HEADER_PREFIX) || lower.equals("x-api-key")) {
+                continue;
+            }
             headers.addAll(name, Collections.list(request.getHeaders(name)));
+        }
+        if (request.getAttribute(AuthInterceptor.SCOPE_ATTRIBUTE) instanceof ScopeResolver.Scope scope) {
+            headers.set("X-Moses-Project-Id", scope.projectId());
+            headers.set("X-Moses-Environment", scope.environment());
         }
 
         HttpMethod method = HttpMethod.valueOf(request.getMethod());
@@ -112,6 +124,8 @@ public class ProxyController {
             }
         }
     }
+
+    private static final String SCOPE_HEADER_PREFIX = "x-moses-";
 
     private static final java.util.Set<String> HOP_BY_HOP_HEADERS = java.util.Set.of(
             "transfer-encoding", "content-length", "connection", "keep-alive",

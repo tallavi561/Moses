@@ -2,6 +2,8 @@ package com.moses.monitor.process;
 
 import jakarta.validation.Valid;
 import org.springframework.data.mongodb.core.MongoTemplate;
+import org.springframework.data.mongodb.core.query.Criteria;
+import org.springframework.data.mongodb.core.query.Query;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.DeleteMapping;
 import org.springframework.web.bind.annotation.GetMapping;
@@ -9,6 +11,7 @@ import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.PutMapping;
 import org.springframework.web.bind.annotation.RequestBody;
+import org.springframework.web.bind.annotation.RequestHeader;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
 
@@ -19,7 +22,8 @@ import java.util.UUID;
  * CRUD for edges between nodes. A connection is normally created implicitly
  * via a node's "connections" list (see ProcessStateController), but can also
  * be created and edited directly here - this is how direction/communication
- * type/description get set after the fact.
+ * type/description get set after the fact. Connections belong to a project and
+ * are the same in all of its environments.
  */
 @RestController
 @RequestMapping("/api/process/connections")
@@ -32,23 +36,26 @@ public class ConnectionController {
     }
 
     @GetMapping
-    public List<Connection> listConnections() {
-        return mongoTemplate.findAll(Connection.class);
+    public List<Connection> listConnections(@RequestHeader(Scope.PROJECT) String projectId) {
+        return mongoTemplate.find(new Query(Criteria.where("project_id").is(projectId)), Connection.class);
     }
 
     @PostMapping
-    public ResponseEntity<Connection> createConnection(@Valid @RequestBody ConnectionRequest request) {
+    public ResponseEntity<Connection> createConnection(@RequestHeader(Scope.PROJECT) String projectId,
+                                                         @Valid @RequestBody ConnectionRequest request) {
         Connection connection = new Connection();
         connection.setId(UUID.randomUUID().toString());
+        connection.setProjectId(projectId);
         apply(connection, request);
         mongoTemplate.save(connection);
         return ResponseEntity.ok(connection);
     }
 
     @PutMapping("/{id}")
-    public ResponseEntity<Connection> updateConnection(@PathVariable String id,
+    public ResponseEntity<Connection> updateConnection(@RequestHeader(Scope.PROJECT) String projectId,
+                                                         @PathVariable String id,
                                                          @Valid @RequestBody ConnectionRequest request) {
-        Connection existing = mongoTemplate.findById(id, Connection.class);
+        Connection existing = findInProject(projectId, id);
         if (existing == null) {
             return ResponseEntity.notFound().build();
         }
@@ -58,13 +65,20 @@ public class ConnectionController {
     }
 
     @DeleteMapping("/{id}")
-    public ResponseEntity<Void> deleteConnection(@PathVariable String id) {
-        Connection existing = mongoTemplate.findById(id, Connection.class);
+    public ResponseEntity<Void> deleteConnection(@RequestHeader(Scope.PROJECT) String projectId,
+                                                   @PathVariable String id) {
+        Connection existing = findInProject(projectId, id);
         if (existing == null) {
             return ResponseEntity.notFound().build();
         }
         mongoTemplate.remove(existing);
         return ResponseEntity.noContent().build();
+    }
+
+    /** Another project's connection is simply "not found" here. */
+    private Connection findInProject(String projectId, String id) {
+        return mongoTemplate.findOne(
+                new Query(Criteria.where("_id").is(id).and("project_id").is(projectId)), Connection.class);
     }
 
     private void apply(Connection connection, ConnectionRequest request) {

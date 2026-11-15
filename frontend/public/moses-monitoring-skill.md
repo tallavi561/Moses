@@ -21,12 +21,31 @@ If the person running this told you a different URL, use that instead - this is 
 default for the instance this skill was downloaded from. All paths below are relative to
 this base URL.
 
+## Authentication: the API key
+
+Every request below must carry an API key:
+
+```
+X-Api-Key: msk_...
+```
+
+The key belongs to one **environment** (for example `prod` or `staging`) of one MoSes
+**project**; it is what puts this codebase's logs and status under that project, in that
+environment. The project's owner creates it in MoSes under Settings -> Environments and
+keys, where it is shown once. Ask the person running this for the key - do not invent one.
+
+- Read the key from configuration (an environment variable such as `MOSES_API_KEY`), never
+  hard-code or commit it. Use a different key per environment the code is deployed to.
+- Without a valid key the request is rejected with `401`.
+- The key can only send logs and heartbeats. It cannot read anything back.
+
 ## What to do
 
 1. **Find the services/processes in this repo.** Each independently-run process (a web
    server, a worker, a cron job, a CLI daemon that stays up) is one "node" in MoSes.
    Pick a short, stable `serviceName` for each (e.g. `payments-api`, `email-worker`) -
-   this name is the node's identity, so keep it consistent across restarts.
+   this name is the node's identity within the project, so keep it consistent across
+   restarts and identical in every environment.
 
 2. **For each service, send a heartbeat on startup and then periodically** (every
    15-60 seconds is reasonable - pick an interval and set up a timer/scheduled task,
@@ -35,6 +54,7 @@ this base URL.
    ```
    POST /api/process/heartbeat
    Content-Type: application/json
+   X-Api-Key: msk_...
 
    {
      "serviceName": "payments-api",
@@ -79,6 +99,7 @@ this base URL.
    ```
    POST /api/process/heartbeat
    Content-Type: application/json
+   X-Api-Key: msk_...
 
    {
      "serviceName": "payments-api",
@@ -100,6 +121,7 @@ this base URL.
    ```
    POST /api/logs
    Content-Type: application/json
+   X-Api-Key: msk_...
 
    {
      "serviceName": "payments-api",

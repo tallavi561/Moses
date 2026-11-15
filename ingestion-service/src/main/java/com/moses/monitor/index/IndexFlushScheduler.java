@@ -19,7 +19,7 @@ import java.util.concurrent.ConcurrentHashMap;
 
 /**
  * Periodically drains the IngestionBuffer and bulk-upserts the accumulated
- * (word, bucket) -> log_ids additions into the index_buckets collection.
+ * (scope, word, bucket) -> log_ids additions into the index_buckets collection.
  * Using $addToSet means repeated flushes are idempotent and never duplicate
  * a log id even if retried.
  */
@@ -46,9 +46,8 @@ public class IndexFlushScheduler {
         BulkOperations bulkOps = mongoTemplate.bulkOps(BulkOperations.BulkMode.UNORDERED, IndexBucket.class);
         int opCount = 0;
 
-        for (Map.Entry<String, IngestionBuffer.BucketEntry> bucketEntry : snapshot.entrySet()) {
-            String bucketKey = bucketEntry.getKey();
-            IngestionBuffer.BucketEntry data = bucketEntry.getValue();
+        for (IngestionBuffer.BucketEntry data : snapshot.values()) {
+            String bucketKey = data.getBucketKey();
 
             for (Map.Entry<String, Set<String>> wordEntry : data.getWordToLogIds().entrySet()) {
                 String word = wordEntry.getKey();
@@ -57,7 +56,8 @@ public class IndexFlushScheduler {
                     continue;
                 }
 
-                Query query = Query.query(Criteria.where("word").is(word).and("bucket").is(bucketKey));
+                Query query = Query.query(Criteria.where("scope").is(data.getScope())
+                        .and("word").is(word).and("bucket").is(bucketKey));
                 Update update = new Update()
                         .addToSet("log_ids").each(ids.toArray())
                         .setOnInsert("bucket_start", data.getBucketStart());

@@ -16,12 +16,25 @@ import java.util.concurrent.atomic.AtomicReference;
 @Component
 public class IngestionBuffer {
 
+    /** The words seen in one time bucket of one scope (a project's environment). */
     public static final class BucketEntry {
+        final String scope;
+        final String bucketKey;
         final Instant bucketStart;
         final ConcurrentHashMap<String, Set<String>> wordToLogIds = new ConcurrentHashMap<>();
 
-        BucketEntry(Instant bucketStart) {
+        BucketEntry(String scope, String bucketKey, Instant bucketStart) {
+            this.scope = scope;
+            this.bucketKey = bucketKey;
             this.bucketStart = bucketStart;
+        }
+
+        public String getScope() {
+            return scope;
+        }
+
+        public String getBucketKey() {
+            return bucketKey;
         }
 
         public Instant getBucketStart() {
@@ -36,9 +49,11 @@ public class IngestionBuffer {
     private final AtomicReference<ConcurrentHashMap<String, BucketEntry>> current =
             new AtomicReference<>(new ConcurrentHashMap<>());
 
-    public void record(String bucketKey, Instant bucketStart, List<String> words, String logId) {
+    public void record(String scope, String bucketKey, Instant bucketStart, List<String> words, String logId) {
         ConcurrentHashMap<String, BucketEntry> map = current.get();
-        BucketEntry entry = map.computeIfAbsent(bucketKey, k -> new BucketEntry(bucketStart));
+        // Neither part can contain a newline, so the pair maps to exactly one entry.
+        BucketEntry entry = map.computeIfAbsent(scope + "\n" + bucketKey,
+                k -> new BucketEntry(scope, bucketKey, bucketStart));
         for (String word : words) {
             entry.wordToLogIds
                     .computeIfAbsent(word, w -> ConcurrentHashMap.newKeySet())

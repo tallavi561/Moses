@@ -162,8 +162,8 @@ are real gaps worth tracking rather than "discovering" again in six months:
 - `POST /api/process/heartbeat` - a service/process reports its status (`UP` /
   `DEGRADED` / `DOWN` / `UNKNOWN`), optional CPU/memory, and which other services
   it `calls` (used to draw flow-diagram edges).
-- `GET /api/process/state` - current snapshot of all known nodes, consumed by the
-  React flow view (`reactflow`).
+- `GET /api/process/state` - current snapshot of the nodes of one environment of one
+  project (§10), consumed by the React flow view (`reactflow`).
 
 This is intentionally minimal: no history, no alerting, no automatic
 process-discovery agent yet. It proves the pipeline (heartbeat → state → flow
@@ -210,9 +210,6 @@ through `api-gateway`, matching the real deployed topology.
 **Not yet done:**
 - Real LLM integration for NL query understanding (currently a rule-based stub)
 - Anomaly detection and summarization logic (currently 501 stubs)
-- Backend multi-tenancy: accounts, projects and membership are real now (§9), but logs,
-  search and architecture data carry no `projectId`, so every signed-in user sees the same
-  monitoring data whichever project is open
 - Repo+AI driven topology discovery (see VISION.md §2/§8)
 
 ## 8. Render deployment
@@ -291,7 +288,7 @@ belongs to which team.
 **How it works**
 - `auth-service` owns three collections nobody else touches: `users` (email unique and stored
   lowercased, bcrypt password hash), `projects` (name + embedded member list with a role per
-  member: `OWNER` / `MEMBER`) and `project_invites` (the invite token is the id; a TTL index
+  member, see §10) and `project_invites` (the invite token is the id; a TTL index
   deletes it at `expires_at`, 7 days by default).
 - Sign-up / sign-in answer with a signed token (JWT, HS256, 7 days by default). The frontend
   keeps it in `localStorage` and sends it as `Authorization: Bearer ...` on every request
@@ -299,8 +296,8 @@ belongs to which team.
 - `api-gateway` verifies the token itself with the shared `JWT_SECRET` (no call to
   `auth-service` per request) and answers 401 otherwise. Open without a token:
   `POST /api/auth/login`, `POST /api/auth/register`, `GET /api/invites/{token}` (so the join
-  page can name the project), and - unchanged from before - `POST /api/logs` and
-  `POST /api/process/heartbeat`, which monitored services call.
+  page can name the project). `POST /api/logs` and `POST /api/process/heartbeat`, which
+  monitored services call, are no longer open: they need an API key (§10).
 - `auth-service` verifies the token again on its own endpoints rather than trusting a header
   from the gateway, because every backend also has its own public URL on Render.
 - Any user can create a project and becomes its owner. People join in two ways: the owner adds
@@ -324,12 +321,82 @@ usual one: a script injected into the page could read the token.
   `ingestion-service`) still answer anyone who calls their own public Render URL directly;
   only the gateway enforces sign-in. Closing that means each backend checking the token (or
   a gateway-only shared key) too.
-- No key on log/heartbeat ingestion (a per-project API key is the natural next step, and is
-  also what would tie incoming data to a project).
 - No password reset, email verification, sign-in rate limiting, token revocation, or
-  removing a member / leaving a project.
+  leaving a project by yourself (the owner can remove a member, §10).
 
 **A gateway bug this surfaced (fixed)**: the proxy's `RestTemplate` used the default
 `HttpURLConnection`, which cannot relay a downstream 401 on a request with a body - a wrong
 password became a 500 after the 75-second cold-start retry loop. The gateway now uses the JDK
 `HttpClient` (`JdkClientHttpRequestFactory`).
+
+## 10. Who owns the data: projects, environments, roles, API keys (added 2026-11-15)
+
+Until this, monitoring data had no owner: every signed-in user saw every service and log.
+
+**The model - three terms, no more**
+- **Project**: the product being monitored, its team, and the boundary of permissions.
+- **Service**: one running component of the project; a node in the diagram.
+- **Environment**: where the services run (`prod`, `staging`, ...). A tag on the data, not a
+  level in a tree. A project starts with `prod`; the owner adds and removes others.
+
+What belongs to what:
+
+| Data | Belongs to | Stored as |
+|---|---|---|
+| Service definition (name, process name, description) | project | `services`, unique `(project_id, name)` |
+| Connections | project | `connections.project_id` |
+| Service state (status, CPU/memory, last seen, probe URL and results) | project + environment | `process_state`, id `projectId\|environment\|serviceName` |
+| Logs | project + environment | `logs.project_id`, `logs.environment` |
+| Word index | project + environment | `index_buckets.scope` = `projectId\|environment`, unique `(scope, word, bucket)` |
+
+So a service added while looking at `prod` also appears in `staging`, as UNKNOWN until
+something reports for it there; renaming or deleting it applies to every environment. The
+probe URL is per environment, because each environment has its own address.
+
+**Roles** (per project, on the member entry): `OWNER` manages members, environments and keys;
+`EDITOR` adds and edits services and connections; `VIEWER` only reads (and may ask the AI).
+The project's creator is its one owner; the owner hands out `EDITOR` / `VIEWER`, changes them
+and removes members. People who join by link or by email start as `EDITOR` unless the owner
+picks otherwise. `MEMBER`, stored before roles existed, is read as `EDITOR`.
+
+**API keys - how incoming data gets an owner.** A monitored service sends
+`X-Api-Key: msk_...`. A key belongs to one environment of one project, so it alone says where
+a log or heartbeat goes. The owner creates keys under Settings; a key is shown once, and only
+its SHA-256 is stored (`api_keys`, the hash is the id). A key can do exactly two things:
+`POST /api/logs` and `POST /api/process/heartbeat`. Removing an environment revokes its keys.
+
+**Where it is enforced: `api-gateway`** (`AuthInterceptor`, `ScopeResolver`). For every
+monitoring path (`/api/logs`, `/api/search`, `/api/process`, `/api/ai`) the gateway establishes
+a scope before proxying:
+- with `X-Api-Key`: asks `auth-service` (`POST /api/keys/resolve`, a path the gateway does not
+  proxy) which project and environment the key belongs to;
+- with a login token: the frontend names the scope in `X-Project-Id` / `X-Environment`, and the
+  gateway asks `auth-service` (`GET /api/projects/{id}/access`) for the user's role there. Not
+  a member, or no such environment: 404. A `VIEWER` changing something: 403.
+
+It then passes the verified scope downstream as `X-Moses-Project-Id` / `X-Moses-Environment`,
+after stripping any such header the caller sent. The backends filter every query by those
+headers and answer 400 without them; `ai-service` forwards them to `search-service` and
+`process-monitor-service`. Answers from `auth-service` are cached in the gateway for 30
+seconds, so a role change, a removed member or a revoked key takes up to that long to apply.
+
+**Frontend**: `ProjectsContext` tracks the current environment per project (remembered in
+`localStorage`) and hands the pair to `api.ts`, which adds the two headers to every request.
+The environment switcher is in the top bar; pages remount when the project or environment
+changes. Settings has the team (roles, removal) and "Environments and keys".
+
+**Data from before this change** has no project and is therefore invisible: old `logs` and
+`index_buckets` expire by retention; old `process_state` and `connections` documents just stay
+in the database. The old global unique index `word_bucket_unique` is dropped at
+`ingestion-service` startup, since it would reject two projects using the same word in the
+same hour.
+
+**Deliberately not there yet**
+- The backends still trust `X-Moses-*` from anyone who reaches their own URL directly (same
+  gap as §9: only the gateway enforces access). Now it matters more, since those headers
+  choose whose data is returned - a gateway-only shared key on the backends closes it.
+- Permissions per environment (e.g. only some members may see `prod`).
+- More than one owner, transferring ownership, deleting a project.
+- Deleting an environment's data when the environment is removed.
+- An "organization" level above projects. Not needed until one company has many projects
+  with a shared team; it can be added above projects without changing anything below.
