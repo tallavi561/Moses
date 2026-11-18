@@ -104,13 +104,31 @@ staging instead of prod, use the staging key; nothing else changes.
    this name is the node's identity within the project, so keep it consistent across
    restarts and identical in every environment.
 
-2. **Write (or update) a README for each service**, at its root (e.g.
-   `payments-api/README.md`), saying in a few sentences what it does, what it depends on
-   (databases, other services, external APIs), and how to run it locally. If one already
-   exists, only fix it where it's wrong or silent about something you just wired in (the
-   `serviceName` you picked, its connections) - don't rewrite what's already accurate.
-   A reader landing on the repo should be able to tell what each service is for without
-   opening MoSes.
+2. **Write (or update) a detailed README for each service**, at its root (e.g.
+   `payments-api/README.md`). A reader landing on the repo - or on the service's node in
+   MoSes - should understand what it is and how it fits in without reading its source.
+   Cover, in this order:
+   - **What it does** - a short paragraph: its purpose and responsibility, in plain
+     language (not just "handles payments" - what requests/events it actually handles,
+     what it owns).
+   - **Its `serviceName`** - state the exact name you registered it under in MoSes, so the
+     README and the Architecture page are never out of sync.
+   - **Dependencies** - every database, queue, external API, and other internal service it
+     calls, one line each. Match this list to the `connections` you send in its heartbeat;
+     if they drift apart, fix whichever one is wrong.
+   - **Who calls it** - the other services that call this one (the other direction of
+     `connections`), if known.
+   - **Configuration** - every environment variable it reads (including `MOSES_URL` /
+     `MOSES_API_KEY`), with a one-line meaning for each and whether it's required.
+   - **Running it locally** - the exact commands (install, build, start), and anything it
+     needs running alongside it (a local database, another service, env vars to set).
+   - **Monitoring** - one line noting it reports to MoSes (heartbeats and/or logs), and
+     where to look (Architecture / Search / Dashboard pages) rather than duplicating that
+     explanation.
+   If a README already exists, don't rewrite what's already accurate - only add or fix
+   what's missing or wrong, especially anything you just wired in (the `serviceName`,
+   its connections, the MoSes config vars). Keep it current: when a later change to the
+   service affects any of the sections above, update the README in the same change.
 
 3. **Add the configuration**: `MOSES_URL` and `MOSES_API_KEY` for every service, read at
    startup, wired into each deployment environment the codebase has (look for existing
