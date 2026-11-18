@@ -12,6 +12,7 @@ import FlowPage from "./pages/FlowPage";
 import SettingsPage from "./pages/SettingsPage";
 import JoinPage from "./pages/JoinPage";
 import ChatPage from "./pages/ChatPage";
+import DashboardPage from "./pages/DashboardPage";
 import ComingSoonPage from "./pages/ComingSoonPage";
 import "./App.css";
 
@@ -33,7 +34,7 @@ export default function App() {
                   <Route path="chat" element={<ChatPage />} />
                   <Route path="search" element={<SearchPage />} />
                   <Route path="flow" element={<FlowPage />} />
-                  <Route path="dashboard" element={<ComingSoonPage />} />
+                  <Route path="dashboard" element={<DashboardPage />} />
                   <Route path="uploads" element={<ComingSoonPage />} />
                   <Route path="settings" element={<SettingsPage />} />
                 </Route>

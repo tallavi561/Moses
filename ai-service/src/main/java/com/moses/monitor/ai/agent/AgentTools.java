@@ -107,6 +107,15 @@ public class AgentTools {
                             + "health-probe results, and the connections between them.",
                     Map.of(),
                     null));
+            specs.add(spec("get_metrics",
+                    "CPU% and memory (MB) history for one or more services over a time window: sample count, "
+                            + "avg/min/max for each metric, and when the latest sample was. Use this for \"how much "
+                            + "CPU/memory is X using\" or trend questions instead of get_services, which only has "
+                            + "the latest reading.",
+                    props("services", Map.of("type", "array", "items", Map.of("type", "string"),
+                                    "description", "Service names to cover (optional - all services if left out)"),
+                            "minutes_back", integer("How far back to look, in minutes (default 60, max 10080 = 7 days)")),
+                    null));
             return specs;
         }
 
@@ -126,6 +135,7 @@ public class AgentTools {
                         i(in, "min_level"), i(in, "minutes_back"), s(in, "trace_id"), i(in, "limit"));
                 case "get_trace" -> monitoring.trace(scope, required(in, "trace_id"));
                 case "get_services" -> monitoring.services(scope);
+                case "get_metrics" -> monitoring.metricsHistory(scope, words(in.get("services")), i(in, "minutes_back"));
                 default -> throw new IllegalArgumentException("unknown tool " + name);
             };
         }

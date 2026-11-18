@@ -414,6 +414,68 @@ export async function deleteConnection(id: string): Promise<void> {
   if (!res.ok) throw new Error(`Failed to delete connection: ${res.status}`);
 }
 
+// ---- dashboards & metrics ----
+
+export type DashboardScope = "ENVIRONMENT" | "SERVICE";
+
+export interface DashboardView {
+  id: string;
+  scope: DashboardScope;
+  serviceName: string | null;
+  title: string;
+  createdBy: string | null;
+  createdAt: string;
+}
+
+export interface DashboardPayload {
+  scope: DashboardScope;
+  serviceName?: string;
+  title?: string;
+}
+
+export async function fetchDashboards(): Promise<DashboardView[]> {
+  const res = await apiFetch(`${API_BASE_URL}/api/process/dashboards`);
+  if (!res.ok) throw new Error(`Failed to load dashboards: ${res.status}`);
+  return res.json();
+}
+
+export async function createDashboard(payload: DashboardPayload): Promise<DashboardView> {
+  const res = await apiFetch(`${API_BASE_URL}/api/process/dashboards`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(payload),
+  });
+  if (!res.ok) throw new Error(`Failed to create dashboard: ${res.status}`);
+  return res.json();
+}
+
+export async function deleteDashboard(id: string): Promise<void> {
+  const res = await apiFetch(`${API_BASE_URL}/api/process/dashboards/${encodeURIComponent(id)}`, {
+    method: "DELETE",
+  });
+  if (!res.ok) throw new Error(`Failed to delete dashboard: ${res.status}`);
+}
+
+export interface MetricPoint {
+  timestamp: string;
+  cpuPercent: number | null;
+  memoryMb: number | null;
+}
+
+export interface ServiceMetrics {
+  serviceName: string;
+  samples: MetricPoint[];
+}
+
+export async function fetchMetrics(services?: string[], minutesBack?: number): Promise<ServiceMetrics[]> {
+  const params = new URLSearchParams();
+  services?.forEach((s) => params.append("service", s));
+  if (minutesBack) params.append("minutesBack", String(minutesBack));
+  const res = await apiFetch(`${API_BASE_URL}/api/process/metrics?${params.toString()}`);
+  if (!res.ok) throw new Error(`Failed to load metrics: ${res.status}`);
+  return res.json();
+}
+
 /** How the AI service understood a free-text question. */
 export interface AiInterpretation {
   words: string[];

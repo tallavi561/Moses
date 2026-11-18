@@ -95,6 +95,56 @@ public class MonitoringReader {
         return out.toString();
     }
 
+    /** Avg/min/max CPU% and memory over the window, not the raw points - a model doesn't need every sample. */
+    public String metricsHistory(Scope scope, List<String> serviceNames, Integer minutesBack) {
+        int minutes = Math.max(1, Math.min(minutesBack == null ? 60 : minutesBack, (int) Duration.ofDays(7).toMinutes()));
+        UriComponentsBuilder uri = UriComponentsBuilder.fromHttpUrl(processUrl + "/api/process/metrics")
+                .queryParam("minutesBack", minutes);
+        if (serviceNames != null) {
+            serviceNames.stream().filter(s -> s != null && !s.isBlank()).limit(20).forEach(s -> uri.queryParam("service", s.trim()));
+        }
+        List<?> series = get(scope, uri.build().encode().toUri(), List.class);
+        if (series == null || series.isEmpty()) {
+            return "No services with metrics in the last " + minutes + " minutes (environment " + scope.environment() + ").";
+        }
+        StringBuilder out = new StringBuilder("CPU%/memory over the last " + minutes + " minutes:\n");
+        for (Object o : series) {
+            Map<?, ?> s = (Map<?, ?>) o;
+            Object name = s.get("serviceName");
+            List<?> samples = s.get("samples") instanceof List<?> l ? l : List.of();
+            if (samples.isEmpty()) {
+                out.append("- ").append(name).append(": no metric samples in this window\n");
+                continue;
+            }
+            out.append("- ").append(name).append(": ").append(samples.size()).append(" samples");
+            summarize(out, samples, "cpuPercent", " | cpu% ");
+            summarize(out, samples, "memoryMb", " | memMB ");
+            Map<?, ?> last = (Map<?, ?>) samples.get(samples.size() - 1);
+            out.append(" | latest at ").append(last.get("timestamp"));
+            out.append('\n');
+        }
+        return out.toString();
+    }
+
+    private static void summarize(StringBuilder out, List<?> samples, String field, String label) {
+        double min = Double.MAX_VALUE, max = -Double.MAX_VALUE, sum = 0;
+        int count = 0;
+        for (Object o : samples) {
+            Object v = ((Map<?, ?>) o).get(field);
+            if (v instanceof Number n) {
+                double d = n.doubleValue();
+                min = Math.min(min, d);
+                max = Math.max(max, d);
+                sum += d;
+                count++;
+            }
+        }
+        if (count == 0) {
+            return;
+        }
+        out.append(label).append(String.format("avg %.1f, min %.1f, max %.1f", sum / count, min, max));
+    }
+
     public String services(Scope scope) {
         List<?> states = get(scope, java.net.URI.create(processUrl + "/api/process/state"), List.class);
         List<?> connections = get(scope, java.net.URI.create(processUrl + "/api/process/connections"), List.class);

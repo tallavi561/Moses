@@ -1,20 +1,31 @@
 package com.moses.monitor.process;
 
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.boot.context.event.ApplicationReadyEvent;
 import org.springframework.context.event.EventListener;
 import org.springframework.data.domain.Sort;
 import org.springframework.data.mongodb.core.MongoTemplate;
 import org.springframework.data.mongodb.core.index.Index;
+import org.springframework.data.mongodb.core.index.IndexInfo;
+import org.springframework.data.mongodb.core.index.IndexOperations;
 import org.springframework.stereotype.Component;
 
-/** The indexes behind "this environment's services, state and connections". */
+import java.time.Duration;
+import java.util.Optional;
+
+/** The indexes behind "this environment's services, state, connections, dashboards and metrics". */
 @Component
 public class ScopeIndexInitializer {
 
-    private final MongoTemplate mongoTemplate;
+    private static final String METRICS_TTL_INDEX = "ttl_metric_samples_timestamp";
 
-    public ScopeIndexInitializer(MongoTemplate mongoTemplate) {
+    private final MongoTemplate mongoTemplate;
+    private final int metricsRetentionDays;
+
+    public ScopeIndexInitializer(MongoTemplate mongoTemplate,
+                                  @Value("${moses.metrics.retention-days}") int metricsRetentionDays) {
         this.mongoTemplate = mongoTemplate;
+        this.metricsRetentionDays = metricsRetentionDays;
     }
 
     @EventListener(ApplicationReadyEvent.class)
@@ -33,6 +44,30 @@ public class ScopeIndexInitializer {
         mongoTemplate.indexOps(Connection.class).ensureIndex(
                 new Index().on("project_id", Sort.Direction.ASC).on("environment", Sort.Direction.ASC)
                         .named("idx_connections_project_environment"));
+
+        mongoTemplate.indexOps(Dashboard.class).ensureIndex(
+                new Index().on("project_id", Sort.Direction.ASC).on("environment", Sort.Direction.ASC)
+                        .named("idx_dashboards_project_environment"));
+
+        mongoTemplate.indexOps(MetricSample.class).ensureIndex(
+                new Index().on("project_id", Sort.Direction.ASC).on("environment", Sort.Direction.ASC)
+                        .on("service_name", Sort.Direction.ASC).on("timestamp", Sort.Direction.DESC)
+                        .named("idx_metrics_scope_timestamp"));
+        ensureTtlIndex(MetricSample.class, METRICS_TTL_INDEX, "timestamp", Duration.ofDays(metricsRetentionDays));
+    }
+
+    /** Heartbeats are far more frequent than logs, so metrics get their own (shorter) TTL window. */
+    private void ensureTtlIndex(Class<?> entityClass, String indexName, String field, Duration ttl) {
+        IndexOperations indexOps = mongoTemplate.indexOps(entityClass);
+        Optional<IndexInfo> existing = indexOps.getIndexInfo().stream()
+                .filter(info -> info.getName().equals(indexName))
+                .findFirst();
+        boolean needsRecreate = existing.isPresent()
+                && existing.get().getExpireAfter().map(d -> !d.equals(ttl)).orElse(true);
+        if (existing.isEmpty() || needsRecreate) {
+            existing.ifPresent(info -> indexOps.dropIndex(indexName));
+            indexOps.ensureIndex(new Index().on(field, Sort.Direction.ASC).expire(ttl).named(indexName));
+        }
     }
 
     private void dropIfPresent(Class<?> type, String indexName) {

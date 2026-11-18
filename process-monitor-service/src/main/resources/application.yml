@@ -18,3 +18,5 @@ moses:
   liveness:
     stale-after-seconds: ${STALE_AFTER_SECONDS:180}
     check-interval-ms: ${STALE_CHECK_INTERVAL_MS:30000}
+  metrics:
+    retention-days: ${METRICS_RETENTION_DAYS:3}

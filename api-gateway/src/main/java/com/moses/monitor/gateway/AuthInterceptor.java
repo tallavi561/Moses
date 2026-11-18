@@ -131,10 +131,15 @@ public class AuthInterceptor implements HandlerInterceptor {
                 || under(path, "/api/process") || under(path, "/api/ai") || under(path, "/api/chat");
     }
 
-    /** The two things a monitored service does: send a log, report a heartbeat. */
+    /**
+     * What a monitored service can do with just its API key: send a log, report a heartbeat, and
+     * ask for a dashboard to be created for itself (see moses-monitoring-skill.md) - nothing else,
+     * in particular never read anything back.
+     */
     static boolean acceptsApiKey(String method, String path) {
         return "POST".equalsIgnoreCase(method)
-                && (path.equals("/api/logs") || path.equals("/api/process/heartbeat"));
+                && (path.equals("/api/logs") || path.equals("/api/process/heartbeat")
+                        || path.equals("/api/process/dashboards"));
     }
 
     /** Requests that change monitoring data. Asking the AI a question is a POST but only reads. */

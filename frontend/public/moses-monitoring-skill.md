@@ -69,7 +69,7 @@ headers like `X-Project-Id` / `X-Environment` are ignored for key requests. To r
 staging instead of prod, use the staging key; nothing else changes.
 
 - The project's owner creates keys in MoSes under **Settings -> Environments and keys**,
-  choosing the environment for each. The key is shown once; MoSes stores only its hash.
+  choosing the environment for each. The owner can show or copy a key again later under Settings.
   **Ask the person running this for the key(s)** - one per environment the code is deployed
   to. Never invent one, and never reuse the prod key for another environment.
 - Read the key from configuration, never hard-code or commit it. Recommended:
@@ -104,13 +104,21 @@ staging instead of prod, use the staging key; nothing else changes.
    this name is the node's identity within the project, so keep it consistent across
    restarts and identical in every environment.
 
-2. **Add the configuration**: `MOSES_URL` and `MOSES_API_KEY` for every service, read at
+2. **Write (or update) a README for each service**, at its root (e.g.
+   `payments-api/README.md`), saying in a few sentences what it does, what it depends on
+   (databases, other services, external APIs), and how to run it locally. If one already
+   exists, only fix it where it's wrong or silent about something you just wired in (the
+   `serviceName` you picked, its connections) - don't rewrite what's already accurate.
+   A reader landing on the repo should be able to tell what each service is for without
+   opening MoSes.
+
+3. **Add the configuration**: `MOSES_URL` and `MOSES_API_KEY` for every service, read at
    startup, wired into each deployment environment the codebase has (look for existing
    per-environment config: `.env.*` files, Docker Compose, Kubernetes/Helm, CI deploy
    jobs, platform settings). Where you cannot set the real values, leave clearly marked
    placeholders and list them in your report.
 
-3. **For each service, send a heartbeat on startup and then periodically** (every
+4. **For each service, send a heartbeat on startup and then periodically** (every
    15-60 seconds is reasonable - pick an interval and set up a timer/scheduled task,
    whatever is idiomatic for this language/framework):
 
@@ -185,7 +193,7 @@ staging instead of prod, use the staging key; nothing else changes.
    - Use a probe only when the health endpoint is reachable from the MoSes instance (same
      network / public internet). Probe-only services have no CPU/memory metrics.
 
-4. **Send logs** for anything you'd currently print/log to stdout or a log file -
+5. **Send logs** for anything you'd currently print/log to stdout or a log file -
    requests, errors, significant state changes:
 
    ```
@@ -255,22 +263,63 @@ staging instead of prod, use the staging key; nothing else changes.
    - Never send the `X-Api-Key` header to anything other than MoSes, and never log it.
    - Don't log secrets, full request/response bodies, or personal data in `rawMessage`.
 
-5. **Double-check the `connections` lists are consistent.** Every service that sends
-   `connections` must list all of its neighbours (both directions), and every environment
-   must send the same lists - otherwise heartbeats keep removing and re-adding each
-   other's edges. When in doubt, send `connections` only from the services whose
-   neighbours you are sure of, and omit the field on the rest.
+6. **Double-check the `connections` lists are consistent.** Within an environment, every
+   service that sends `connections` must list all of its neighbours (both directions) -
+   otherwise heartbeats keep removing and re-adding each other's edges. Each environment
+   has its own diagram, so lists may differ between environments when the deployments
+   really differ (e.g. a service that only exists in staging). When in doubt, send
+   `connections` only from the services whose neighbours you are sure of, and omit the
+   field on the rest.
 
-6. **Report back to the person running this** what you set up:
+7. **Ask for the dashboards you think are worth watching.** A dashboard is a saved view on
+   the Dashboard page: either the whole environment, or one specific service, each showing
+   that scope's live status and a CPU/memory chart. You don't build the chart yourself -
+   just declare which ones you want and MoSes creates them:
+
+   ```
+   POST /api/process/dashboards
+   Content-Type: application/json
+   X-Api-Key: msk_...
+
+   {
+     "scope": "SERVICE",
+     "serviceName": "payments-api",
+     "title": "payments-api"
+   }
+   ```
+
+   - `scope` (required) is `"ENVIRONMENT"` (the whole environment this key belongs to - no
+     `serviceName`) or `"SERVICE"` (one specific service - `serviceName` required, must be
+     one of the `serviceName`s you're reporting under). There is no third scope: a
+     "process" dashboard *is* a service dashboard here - a service's heartbeat already
+     **is** its process state, so watching one process means watching one service.
+   - `title` is optional; a sensible default is used if left out.
+   - This call is **idempotent**: asking again for the same `(scope, serviceName)` updates
+     the existing dashboard's title instead of creating a duplicate, so it's safe to run on
+     every integration/deploy rather than tracking "did I already ask for this one".
+   - A reasonable default: one `ENVIRONMENT` dashboard for the overall picture, plus one
+     `SERVICE` dashboard for any service whose resource use is worth watching on its own
+     (high traffic, known to be CPU/memory-heavy, or one you're actively tuning) - not
+     necessarily every single service, which would just be noise.
+   - This is the one other thing an API key may do beyond logs/heartbeats (see the response
+     table above - the same status codes apply here, including a plain `400` if `scope` is
+     missing or `serviceName` is missing for a `SERVICE` dashboard).
+
+8. **Report back to the person running this** what you set up:
    - which services got heartbeats (and whether they report `cpuPercent`/`memoryMb`), and
      which got probe URLs instead;
+   - where each service's README lives and what you wrote or changed in it;
    - where the `Logger` class lives, where the request-logging middleware was added, and
      how the `traceId` is propagated between services;
+   - which dashboards you asked for and why;
    - which environments you wired, which config variables (`MOSES_URL`, `MOSES_API_KEY`)
      each deployment needs, and where they still have to put real keys - reminding them
      to create one key per environment under Settings -> Environments and keys;
    - how to verify: pick the environment under the project name in MoSes, then check the
-     Architecture and Search pages.
+     Architecture, Search and Dashboard pages;
+   - that the project owner can connect this codebase's GitHub repository under
+     Settings -> Repository, so the MoSes AI agent in the project chat can read the code
+     alongside the logs and services you just wired up.
 
 ## What NOT to do
 

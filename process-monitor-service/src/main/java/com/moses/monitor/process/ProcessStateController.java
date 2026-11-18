@@ -62,8 +62,18 @@ public class ProcessStateController {
         carryOverProbeTelemetry(existing, state);
 
         mongoTemplate.save(state);
+        recordMetricSample(projectId, environment, serviceName, request.getCpuPercent(), request.getMemoryMb());
         syncConnections(projectId, environment, serviceName, request.getConnections());
         return ResponseEntity.accepted().build();
+    }
+
+    /** Keeps the latest reading on {@link ProcessState} AND a timestamped point for the metrics chart. */
+    private void recordMetricSample(String projectId, String environment, String serviceName,
+                                    Double cpuPercent, Double memoryMb) {
+        if (cpuPercent == null && memoryMb == null) {
+            return;
+        }
+        mongoTemplate.save(new MetricSample(projectId, environment, serviceName, Instant.now(), cpuPercent, memoryMb));
     }
 
     @GetMapping("/state")
