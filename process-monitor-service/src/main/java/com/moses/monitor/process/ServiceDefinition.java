@@ -5,9 +5,9 @@ import org.springframework.data.mongodb.core.mapping.Document;
 import org.springframework.data.mongodb.core.mapping.Field;
 
 /**
- * What a service of a project is: its name and how it is described. One document per service
- * per project, shared by all of the project's environments - where it runs and how it is doing
- * there is a {@link ProcessState}, one per environment.
+ * What a service is: its name and how it is described. One document per service per
+ * environment of a project - each environment has its own architecture, like a namespace in
+ * OpenShift. How the service is doing there is its {@link ProcessState}.
  */
 @Document(collection = "services")
 public class ServiceDefinition {
@@ -18,7 +18,10 @@ public class ServiceDefinition {
     @Field("project_id")
     private String projectId;
 
-    /** Unique within the project (see {@link ScopeIndexInitializer}). */
+    @Field("environment")
+    private String environment;
+
+    /** Unique within the environment (see {@link ScopeIndexInitializer}). */
     @Field("name")
     private String name;
 
@@ -32,6 +35,8 @@ public class ServiceDefinition {
     public void setId(String id) { this.id = id; }
     public String getProjectId() { return projectId; }
     public void setProjectId(String projectId) { this.projectId = projectId; }
+    public String getEnvironment() { return environment; }
+    public void setEnvironment(String environment) { this.environment = environment; }
     public String getName() { return name; }
     public void setName(String name) { this.name = name; }
     public String getProcessName() { return processName; }

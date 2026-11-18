@@ -44,12 +44,19 @@ public class ProjectController {
 
     public record ChangeRoleRequest(@NotNull Project.Role role) { }
 
-    public record ProjectView(String id, String name, Project.Role role, int memberCount, List<String> environments) {
+    public record ProjectView(String id, String name, Project.Role role, int memberCount, List<String> environments,
+                              String repoUrl) {
         static ProjectView of(Project project, String userId) {
             return new ProjectView(project.getId(), project.getName(), project.roleOf(userId),
-                    project.getMembers().size(), project.getEnvironments());
+                    project.getMembers().size(), project.getEnvironments(), project.getRepoUrl());
         }
     }
+
+    /** Empty or null clears it. Only public GitHub-style https URLs - never a local path or another scheme. */
+    public record RepoRequest(@Size(max = 200) String repoUrl) { }
+
+    static final java.util.regex.Pattern GITHUB_REPO =
+            java.util.regex.Pattern.compile("^https://github\\.com/[A-Za-z0-9_][A-Za-z0-9_.-]*/[A-Za-z0-9_][A-Za-z0-9_.-]*?(\\.git)?/?$");
 
     public record MemberView(String userId, String name, String email, Project.Role role, Instant joinedAt) { }
 
@@ -91,6 +98,26 @@ public class ProjectController {
         project.getMembers().add(new Project.Member(user.getId(), Project.Role.OWNER));
         project.setEnvironments(new java.util.ArrayList<>(List.of(Project.DEFAULT_ENVIRONMENT)));
         mongoTemplate.insert(project);
+        return ProjectView.of(project, user.getId());
+    }
+
+    /** The repository the project's agent reads. Owner only. */
+    @PutMapping("/api/projects/{projectId}/repo")
+    public ProjectView setRepo(HttpServletRequest request, @PathVariable String projectId,
+                               @Valid @RequestBody RepoRequest body) {
+        User user = currentUser.require(request);
+        Project project = guard.requireOwner(projectId, user);
+        String url = body.repoUrl() == null ? "" : body.repoUrl().trim();
+        if (!url.isEmpty() && !GITHUB_REPO.matcher(url).matches()) {
+            throw new org.springframework.web.server.ResponseStatusException(
+                    org.springframework.http.HttpStatus.BAD_REQUEST, "expected https://github.com/<owner>/<repo>");
+        }
+        if (url.endsWith("/")) url = url.substring(0, url.length() - 1);
+        if (url.endsWith(".git")) url = url.substring(0, url.length() - 4);
+        mongoTemplate.updateFirst(new Query(Criteria.where("_id").is(projectId)),
+                new org.springframework.data.mongodb.core.query.Update().set("repo_url", url.isEmpty() ? null : url),
+                Project.class);
+        project.setRepoUrl(url.isEmpty() ? null : url);
         return ProjectView.of(project, user.getId());
     }
 

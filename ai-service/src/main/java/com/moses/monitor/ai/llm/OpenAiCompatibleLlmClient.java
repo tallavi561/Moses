@@ -60,6 +60,33 @@ public class OpenAiCompatibleLlmClient implements LlmClient {
         return text;
     }
 
+    /** Lists the provider's models with the key: a rejected key fails here, an unknown model is reported. */
+    @Override
+    @SuppressWarnings("unchecked")
+    public void verify() {
+        HttpHeaders headers = new HttpHeaders();
+        if (apiKey != null && !apiKey.isBlank()) {
+            headers.setBearerAuth(apiKey);
+        }
+        String modelsUrl = endpoint.substring(0, endpoint.length() - "/chat/completions".length()) + "/models";
+        Map<String, Object> response;
+        try {
+            response = http.exchange(modelsUrl, org.springframework.http.HttpMethod.GET, new HttpEntity<>(headers), Map.class)
+                    .getBody();
+        } catch (org.springframework.web.client.HttpClientErrorException e) {
+            if (e.getStatusCode().value() == 401 || e.getStatusCode().value() == 403) {
+                throw new IllegalArgumentException("The provider rejected this API key.");
+            }
+            throw new IllegalArgumentException("The provider answered " + e.getStatusCode().value() + " at " + modelsUrl);
+        }
+        if (response != null && response.get("data") instanceof List<?> data && !data.isEmpty()) {
+            boolean known = data.stream().anyMatch(m -> m instanceof Map<?, ?> map && model.equals(map.get("id")));
+            if (!known) {
+                throw new IllegalArgumentException("The provider has no model named '" + model + "'.");
+            }
+        }
+    }
+
     @Override
     public String describe() {
         return "openai-compatible:" + model;

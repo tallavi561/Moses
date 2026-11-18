@@ -1,6 +1,6 @@
 <#
 .SYNOPSIS
-  Builds and starts all 7 MoSes services locally, each in its own tab of a single
+  Builds and starts all 8 MoSes services locally, each in its own tab of a single
   Windows Terminal window (or its own PowerShell window if Windows Terminal is missing).
   Requires: Java 21, Maven, Node.js, and MongoDB - either reachable at localhost:27017,
   or an external one given in the MONGODB_URI environment variable.
@@ -60,7 +60,30 @@ $tabEnv = "`$env:JWT_SECRET = '$quotedSecret'; "
 if ($mongoUri) {
     $tabEnv += "`$env:MONGODB_URI = '$($mongoUri.Replace("'", "''"))'; "
 }
-$tabs = foreach ($name in "ingestion-service", "search-service", "process-monitor-service", "ai-service", "auth-service", "api-gateway") {
+# Two more local-only secrets, generated once and kept in secrets\ (git-ignored) so they survive
+# restarts:
+#  - SECRETS_ENCRYPTION_KEY: auth-service encrypts the AI model keys owners enter in Settings with
+#    it. If it changed, stored keys could not be read any more.
+#  - INTERNAL_API_TOKEN: lets MoSes services call each other's /internal endpoints.
+# The AI model key itself is no longer read from a file here: each project owner enters it in
+# Settings > AI model.
+function Get-LocalSecret([string]$fileName) {
+    $dir = Join-Path $root "secrets"
+    $file = Join-Path $dir $fileName
+    if (-not (Test-Path $file)) {
+        New-Item -ItemType Directory -Force $dir | Out-Null
+        $bytes = New-Object byte[] 32
+        [System.Security.Cryptography.RandomNumberGenerator]::Create().GetBytes($bytes)
+        [Convert]::ToBase64String($bytes) | Out-File -FilePath $file -Encoding ascii -NoNewline
+    }
+    return (Get-Content -Raw $file).Trim()
+}
+$encryptionKey = if ($env:SECRETS_ENCRYPTION_KEY) { $env:SECRETS_ENCRYPTION_KEY } else { Get-LocalSecret "dev-secrets-encryption-key.txt" }
+$internalToken = if ($env:INTERNAL_API_TOKEN) { $env:INTERNAL_API_TOKEN } else { Get-LocalSecret "dev-internal-api-token.txt" }
+$tabEnv += "`$env:SECRETS_ENCRYPTION_KEY = '$($encryptionKey.Replace("'", "''"))'; "
+$tabEnv += "`$env:INTERNAL_API_TOKEN = '$($internalToken.Replace("'", "''"))'; "
+
+$tabs = foreach ($name in "ingestion-service", "search-service", "process-monitor-service", "ai-service", "auth-service", "chat-service", "api-gateway") {
     @{ Title = $name; Dir = $root; Command = "${tabEnv}java -jar '$root\$name\target\$name.jar'" }
 }
 $tabs += @{ Title = "frontend"; Dir = "$root\frontend"; Command = "npm run dev" }
@@ -97,6 +120,7 @@ Write-Host "  search-service           http://localhost:8082"
 Write-Host "  process-monitor-service  http://localhost:8083"
 Write-Host "  ai-service               http://localhost:8084"
 Write-Host "  auth-service             http://localhost:8086"
+Write-Host "  chat-service             http://localhost:8087  (chat WebSocket: ws://localhost:8087/ws/chat)"
 Write-Host "  api-gateway              http://localhost:8085  (frontend talks to this)"
 Write-Host "  frontend (Vite dev)      http://localhost:5173"
 Write-Host ""

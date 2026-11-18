@@ -91,6 +91,25 @@ services:
         sync: false
 
   - type: web
+    name: chat-service
+    env: docker
+    dockerfilePath: ./chat-service/Dockerfile
+    dockerContext: .
+    plan: free
+    envVars:
+      - key: MONGODB_URI
+        sync: false
+      # Same value as on auth-service and api-gateway.
+      - key: JWT_SECRET
+        sync: false
+      - key: AUTH_SERVICE_URL
+        sync: false
+      - key: AI_SERVICE_URL
+        sync: false
+      - key: FRONTEND_ORIGIN
+        sync: false
+
+  - type: web
     name: api-gateway
     env: docker
     dockerfilePath: ./api-gateway/Dockerfile
@@ -101,6 +120,8 @@ services:
       - key: JWT_SECRET
         sync: false
       - key: AUTH_SERVICE_URL
+        sync: false
+      - key: CHAT_SERVICE_URL
         sync: false
       # Downstream URLs are the services' PUBLIC https://*.onrender.com URLs, set by hand
       # in the dashboard. Not fromService/hostport: that is the private-network address,

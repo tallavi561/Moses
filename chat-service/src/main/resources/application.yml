@@ -1,0 +1,36 @@
+server:
+  port: ${PORT:8087}
+  error:
+    include-message: always
+
+spring:
+  threads:
+    virtual:
+      enabled: true
+  application:
+    name: chat-service
+  data:
+    mongodb:
+      uri: ${MONGODB_URI:mongodb://localhost:27017/moses_monitor}
+      auto-index-creation: true
+
+moses:
+  jwt:
+    # Same key auth-service signs login tokens with; this service verifies them itself (the
+    # WebSocket does not go through api-gateway). No default: refuses to start without one.
+    secret: ${JWT_SECRET:}
+  auth-service:
+    url: ${AUTH_SERVICE_URL:http://localhost:8086}
+  ai-service:
+    url: ${AI_SERVICE_URL:http://localhost:8084}
+  internal:
+    # Shared secret for /internal endpoints between MoSes services (sent to ai-service).
+    token: ${INTERNAL_API_TOKEN:}
+  # Browser origins allowed to open the WebSocket. Native mobile apps send no Origin and are
+  # accepted; they still have to sign in with a token over the socket.
+  frontend-origin: ${FRONTEND_ORIGIN:http://localhost:5173}
+  chat:
+    # How many earlier messages of the channel the agent sees with a new question.
+    agent-context-messages: ${CHAT_AGENT_CONTEXT_MESSAGES:30}
+    # Longest wait for one agent answer (it may read code and logs over several steps).
+    agent-timeout-seconds: ${CHAT_AGENT_TIMEOUT_SECONDS:300}

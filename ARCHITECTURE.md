@@ -333,25 +333,30 @@ password became a 500 after the 75-second cold-start retry loop. The gateway now
 
 Until this, monitoring data had no owner: every signed-in user saw every service and log.
 
-**The model - three terms, no more**
+**The model - three terms, no more** (changed 2026-11-18: environments are now a level, like
+namespaces in OpenShift, not a tag)
 - **Project**: the product being monitored, its team, and the boundary of permissions.
-- **Service**: one running component of the project; a node in the diagram.
-- **Environment**: where the services run (`prod`, `staging`, ...). A tag on the data, not a
-  level in a tree. A project starts with `prod`; the owner adds and removes others.
+- **Environment**: where the services run (`prod`, `staging`, ...). Each environment is its own
+  space with its own copy of everything below. A project starts with `prod`; the owner adds and
+  removes others.
+- **Service**: one running component in one environment; a node in that environment's diagram.
 
 What belongs to what:
 
 | Data | Belongs to | Stored as |
 |---|---|---|
-| Service definition (name, process name, description) | project | `services`, unique `(project_id, name)` |
-| Connections | project | `connections.project_id` |
+| Service definition (name, process name, description) | project + environment | `services`, unique `(project_id, environment, name)` |
+| Connections | project + environment | `connections.project_id` + `.environment` |
 | Service state (status, CPU/memory, last seen, probe URL and results) | project + environment | `process_state`, id `projectId\|environment\|serviceName` |
 | Logs | project + environment | `logs.project_id`, `logs.environment` |
 | Word index | project + environment | `index_buckets.scope` = `projectId\|environment`, unique `(scope, word, bucket)` |
+| Chat (team channel and each person's private channel with the agent) | project + environment | `chat_messages.project_id` + `.environment` |
+| AI model + key | project (default), optionally overridden per environment | `projects.llm`, `projects.environment_llm.<env>` |
 
-So a service added while looking at `prod` also appears in `staging`, as UNKNOWN until
-something reports for it there; renaming or deleting it applies to every environment. The
-probe URL is per environment, because each environment has its own address.
+So `payments-api` in prod and in staging are two separate nodes; adding, renaming or deleting a
+service in one environment leaves the others alone. Services and connections recorded before
+this change have no environment and are simply no longer shown (the owner chose to re-register
+them rather than migrate).
 
 **Roles** (per project, on the member entry): `OWNER` manages members, environments and keys;
 `EDITOR` adds and edits services and connections; `VIEWER` only reads (and may ask the AI).
@@ -400,3 +405,34 @@ same hour.
 - Deleting an environment's data when the environment is removed.
 - An "organization" level above projects. Not needed until one company has many projects
   with a shared team; it can be added above projects without changing anything below.
+
+## 11. Team chat and the AI agent (added 2026-11-18)
+
+- **`chat-service`** (port 8087) stores messages (`chat_messages`) and pushes them live over a
+  WebSocket (`/ws/chat`; the client signs in with its first message, so the token never goes in
+  a URL). Sending and history are plain REST through api-gateway (`/api/chat/**`, scoped like
+  monitoring data; a viewer may chat). Each environment has its own chat with two kinds of
+  channel: `team` (everyone in the project) and `agent:<userId>` (one person and the agent).
+  The same API serves the web app now and the mobile app later.
+- **The agent** answers every message in a private channel, and in the team channel only when
+  tagged `@moses` or replied to. chat-service hands the message plus the last 30 messages to
+  `ai-service` (`POST /internal/agent/reply`), which runs a tool loop with the environment's
+  model: read-only tools over the project's GitHub repository (a bare clone under
+  `~/.moses/repos`, refreshed at most once a minute; public `https://github.com/...` URLs only,
+  so a setting can never point it at a local folder) and over the environment's logs, traces and
+  services. Tool results are treated as data, not instructions. A per-project daily cap
+  (`AGENT_DAILY_REPLIES_PER_PROJECT`, default 200) guards the bill.
+- **The model and key are configuration, set in the UI** (Settings > AI model): the owner sets a
+  project default and may give any environment its own (also offered when creating an
+  environment). The key is checked with the provider before saving, stored AES-256-GCM
+  encrypted by auth-service (`SECRETS_ENCRYPTION_KEY`), never sent back to a browser (members
+  see the last 4 characters), and read by ai-service per request over
+  `GET /internal/projects/{id}/llm` (cached 30 s). There is no server-wide default key.
+- **Internal calls** (`/internal/**`, never proxied by the gateway) require `INTERNAL_API_TOKEN`,
+  shared by auth-service, ai-service and chat-service. `scripts/start-local.ps1` generates both
+  local secrets once into `secrets/` (git-ignored).
+- **Tool use is implemented for Anthropic only** so far; an OpenAI-compatible model can be saved
+  and is used for search translation, but the agent says it can't use tools with it yet.
+- **Not there yet**: proactive monitoring (the agent speaking up on its own), push
+  notifications, the mobile app, private repositories, and the backends' own URLs still trust
+  the scope headers (see section 10).

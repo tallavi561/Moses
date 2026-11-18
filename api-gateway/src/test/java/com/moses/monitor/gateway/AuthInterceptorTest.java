@@ -26,6 +26,9 @@ class AuthInterceptorTest {
         assertTrue(AuthInterceptor.isScoped("/api/search/page"));
         assertTrue(AuthInterceptor.isScoped("/api/process/state"));
         assertTrue(AuthInterceptor.isScoped("/api/ai/query"));
+        assertTrue(AuthInterceptor.isScoped("/api/chat/messages"));
+        assertFalse(AuthInterceptor.isChange("POST", "/api/chat/messages"));
+        assertFalse(AuthInterceptor.acceptsApiKey("POST", "/api/chat/messages"));
         assertFalse(AuthInterceptor.isScoped("/api/projects"));
         assertFalse(AuthInterceptor.isScoped("/api/auth/me"));
         assertFalse(AuthInterceptor.isScoped("/api/processes"));

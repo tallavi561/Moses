@@ -63,6 +63,14 @@ public class Project {
     private Instant createdAt;
     private List<Member> members = new ArrayList<>();
     private List<String> environments = new ArrayList<>();
+    /** The project's GitHub repository (https://github.com/owner/repo), read by the chat agent. */
+    @Field("repo_url")
+    private String repoUrl;
+    /** The AI model and key the agent uses in every environment without its own. */
+    private LlmSettings llm;
+    /** Environments that use a different model or key (their own bill). */
+    @Field("environment_llm")
+    private java.util.Map<String, LlmSettings> environmentLlm = new java.util.HashMap<>();
 
     /** The user's role, or null when they are not in the project. Never returns MEMBER. */
     public Role roleOf(String userId) {
@@ -79,6 +87,15 @@ public class Project {
 
     public void setEnvironments(List<String> environments) { this.environments = environments; }
 
+    public LlmSettings getLlm() { return llm; }
+    public void setLlm(LlmSettings llm) { this.llm = llm; }
+    public java.util.Map<String, LlmSettings> getEnvironmentLlm() {
+        if (environmentLlm == null) environmentLlm = new java.util.HashMap<>();
+        return environmentLlm;
+    }
+    public void setEnvironmentLlm(java.util.Map<String, LlmSettings> environmentLlm) { this.environmentLlm = environmentLlm; }
+    public String getRepoUrl() { return repoUrl; }
+    public void setRepoUrl(String repoUrl) { this.repoUrl = repoUrl; }
     public String getId() { return id; }
     public void setId(String id) { this.id = id; }
     public String getName() { return name; }

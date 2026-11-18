@@ -106,11 +106,11 @@ class LlmClientAdaptersTest {
     void configPicksTheProviderAndFallsBackToDisabled() {
         LlmConfig config = new LlmConfig();
 
-        assertEquals("none", config.llmClient("none", "", "", "", 5).describe());
-        assertEquals("none", config.llmClient("anthropic", "claude-x", "", "", 5).describe()); // no key
-        assertEquals("none", config.llmClient("openai-compatible", "m", "k", "", 5).describe()); // no base url
-        assertEquals("none", config.llmClient("mystery", "m", "k", "u", 5).describe());
-        assertEquals("anthropic:claude-x", config.llmClient("anthropic", "claude-x", "k", "", 5).describe());
-        assertEquals("openai-compatible:gpt", config.llmClient("openai-compatible", "gpt", "k", "http://h/v1", 5).describe());
+        assertEquals("none", config.llmClient("none", "", "", "", 5, 180).describe());
+        assertEquals("none", config.llmClient("anthropic", "claude-x", "", "", 5, 180).describe()); // no key
+        assertEquals("none", config.llmClient("openai-compatible", "m", "k", "", 5, 180).describe()); // no base url
+        assertEquals("none", config.llmClient("mystery", "m", "k", "u", 5, 180).describe());
+        assertEquals("anthropic:claude-x", config.llmClient("anthropic", "claude-x", "k", "", 5, 180).describe());
+        assertEquals("openai-compatible:gpt", config.llmClient("openai-compatible", "gpt", "k", "http://h/v1", 5, 180).describe());
     }
 }

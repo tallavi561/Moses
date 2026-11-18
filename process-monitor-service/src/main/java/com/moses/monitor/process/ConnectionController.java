@@ -22,8 +22,8 @@ import java.util.UUID;
  * CRUD for edges between nodes. A connection is normally created implicitly
  * via a node's "connections" list (see ProcessStateController), but can also
  * be created and edited directly here - this is how direction/communication
- * type/description get set after the fact. Connections belong to a project and
- * are the same in all of its environments.
+ * type/description get set after the fact. Connections belong to one environment
+ * of a project, like the services they join.
  */
 @RestController
 @RequestMapping("/api/process/connections")
@@ -36,16 +36,20 @@ public class ConnectionController {
     }
 
     @GetMapping
-    public List<Connection> listConnections(@RequestHeader(Scope.PROJECT) String projectId) {
-        return mongoTemplate.find(new Query(Criteria.where("project_id").is(projectId)), Connection.class);
+    public List<Connection> listConnections(@RequestHeader(Scope.PROJECT) String projectId,
+                                            @RequestHeader(Scope.ENVIRONMENT) String environment) {
+        return mongoTemplate.find(new Query(Criteria.where("project_id").is(projectId).and("environment").is(environment)),
+                Connection.class);
     }
 
     @PostMapping
     public ResponseEntity<Connection> createConnection(@RequestHeader(Scope.PROJECT) String projectId,
+                                                         @RequestHeader(Scope.ENVIRONMENT) String environment,
                                                          @Valid @RequestBody ConnectionRequest request) {
         Connection connection = new Connection();
         connection.setId(UUID.randomUUID().toString());
         connection.setProjectId(projectId);
+        connection.setEnvironment(environment);
         apply(connection, request);
         mongoTemplate.save(connection);
         return ResponseEntity.ok(connection);
@@ -53,9 +57,10 @@ public class ConnectionController {
 
     @PutMapping("/{id}")
     public ResponseEntity<Connection> updateConnection(@RequestHeader(Scope.PROJECT) String projectId,
+                                                         @RequestHeader(Scope.ENVIRONMENT) String environment,
                                                          @PathVariable String id,
                                                          @Valid @RequestBody ConnectionRequest request) {
-        Connection existing = findInProject(projectId, id);
+        Connection existing = findInEnvironment(projectId, environment, id);
         if (existing == null) {
             return ResponseEntity.notFound().build();
         }
@@ -66,8 +71,9 @@ public class ConnectionController {
 
     @DeleteMapping("/{id}")
     public ResponseEntity<Void> deleteConnection(@RequestHeader(Scope.PROJECT) String projectId,
+                                                   @RequestHeader(Scope.ENVIRONMENT) String environment,
                                                    @PathVariable String id) {
-        Connection existing = findInProject(projectId, id);
+        Connection existing = findInEnvironment(projectId, environment, id);
         if (existing == null) {
             return ResponseEntity.notFound().build();
         }
@@ -75,10 +81,11 @@ public class ConnectionController {
         return ResponseEntity.noContent().build();
     }
 
-    /** Another project's connection is simply "not found" here. */
-    private Connection findInProject(String projectId, String id) {
+    /** Another project's or environment's connection is simply "not found" here. */
+    private Connection findInEnvironment(String projectId, String environment, String id) {
         return mongoTemplate.findOne(
-                new Query(Criteria.where("_id").is(id).and("project_id").is(projectId)), Connection.class);
+                new Query(Criteria.where("_id").is(id).and("project_id").is(projectId).and("environment").is(environment)),
+                Connection.class);
     }
 
     private void apply(Connection connection, ConnectionRequest request) {

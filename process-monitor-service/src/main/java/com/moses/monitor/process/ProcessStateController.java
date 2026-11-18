@@ -30,10 +30,10 @@ import java.util.stream.Collectors;
  * Node (service) ingestion + read-back, plus node editing/renaming. Edges
  * between nodes are a separate concept - see {@link ConnectionController}.
  *
- * Every request is about one environment of one project (see {@link Scope}). A service's
- * definition and its connections belong to the project; its state belongs to the environment.
- * So a service added while looking at prod also shows up in staging - as UNKNOWN, until
- * something reports for it there - while renaming or deleting it applies everywhere.
+ * Every request is about one environment of one project (see {@link Scope}), and everything
+ * here belongs to that environment: like a namespace in OpenShift, each environment has its own
+ * services, connections and state. Adding, renaming or deleting a service in prod leaves staging
+ * untouched.
  */
 @RestController
 @RequestMapping("/api/process")
@@ -50,7 +50,7 @@ public class ProcessStateController {
                                           @RequestHeader(Scope.ENVIRONMENT) String environment,
                                           @Valid @RequestBody HeartbeatRequest request) {
         String serviceName = request.getServiceName();
-        registerDefinition(projectId, serviceName, request.getProcessName(), request.getDescription());
+        registerDefinition(projectId, environment, serviceName, request.getProcessName(), request.getDescription());
 
         ProcessState existing = findState(projectId, environment, serviceName);
         ProcessState state = new ProcessState(projectId, environment, serviceName);
@@ -62,7 +62,7 @@ public class ProcessStateController {
         carryOverProbeTelemetry(existing, state);
 
         mongoTemplate.save(state);
-        syncConnections(projectId, serviceName, request.getConnections());
+        syncConnections(projectId, environment, serviceName, request.getConnections());
         return ResponseEntity.accepted().build();
     }
 
@@ -74,7 +74,7 @@ public class ProcessStateController {
                         ProcessState.class).stream()
                 .collect(Collectors.toMap(ProcessState::getServiceName, Function.identity(), (a, b) -> a));
 
-        Query definitions = new Query(Criteria.where("project_id").is(projectId))
+        Query definitions = new Query(Criteria.where("project_id").is(projectId).and("environment").is(environment))
                 .with(Sort.by(Sort.Direction.ASC, "name"));
         return mongoTemplate.find(definitions, ServiceDefinition.class).stream()
                 .map(definition -> NodeView.of(definition, states.get(definition.getName())))
@@ -86,14 +86,14 @@ public class ProcessStateController {
                                                @RequestHeader(Scope.ENVIRONMENT) String environment,
                                                @PathVariable String serviceName,
                                                @Valid @RequestBody NodeUpdateRequest request) {
-        ServiceDefinition definition = findDefinition(projectId, serviceName);
+        ServiceDefinition definition = findDefinition(projectId, environment, serviceName);
         if (definition == null) {
             return ResponseEntity.notFound().build();
         }
 
         String newName = request.getServiceName();
         boolean renamed = !serviceName.equals(newName);
-        if (renamed && findDefinition(projectId, newName) != null) {
+        if (renamed && findDefinition(projectId, environment, newName) != null) {
             return ResponseEntity.status(HttpStatus.CONFLICT).build();
         }
 
@@ -102,8 +102,8 @@ public class ProcessStateController {
         definition.setDescription(request.getDescription());
         mongoTemplate.save(definition);
         if (renamed) {
-            renameServiceInStates(projectId, serviceName, newName);
-            renameServiceInConnections(projectId, serviceName, newName);
+            renameServiceInStates(projectId, environment, serviceName, newName);
+            renameServiceInConnections(projectId, environment, serviceName, newName);
         }
 
         ProcessState existing = findState(projectId, environment, newName);
@@ -122,27 +122,32 @@ public class ProcessStateController {
         carryOverProbeTelemetry(existing, updated);
         mongoTemplate.save(updated);
 
-        syncConnections(projectId, newName, request.getConnections());
+        syncConnections(projectId, environment, newName, request.getConnections());
         return ResponseEntity.ok(NodeView.of(definition, updated));
     }
 
-    /** Removes the service from the project: its definition, its state in every environment, its connections. */
+    /** Removes the service from this environment: its definition, its state, its connections. */
     @DeleteMapping("/nodes/{serviceName}")
     public ResponseEntity<Void> deleteNode(@RequestHeader(Scope.PROJECT) String projectId,
+                                           @RequestHeader(Scope.ENVIRONMENT) String environment,
                                            @PathVariable String serviceName) {
         mongoTemplate.remove(
-                new Query(Criteria.where("project_id").is(projectId).and("name").is(serviceName)),
+                new Query(Criteria.where("project_id").is(projectId).and("environment").is(environment)
+                        .and("name").is(serviceName)),
                 ServiceDefinition.class);
-        mongoTemplate.remove(
-                new Query(Criteria.where("project_id").is(projectId).and("service_name").is(serviceName)),
-                ProcessState.class);
-        mongoTemplate.remove(new Query(touching(projectId, serviceName)), Connection.class);
+        mongoTemplate.remove(findStateQuery(projectId, environment, serviceName), ProcessState.class);
+        mongoTemplate.remove(new Query(touching(projectId, environment, serviceName)), Connection.class);
         return ResponseEntity.noContent().build();
     }
 
-    private ServiceDefinition findDefinition(String projectId, String name) {
+    private ServiceDefinition findDefinition(String projectId, String environment, String name) {
         return mongoTemplate.findOne(
-                new Query(Criteria.where("project_id").is(projectId).and("name").is(name)), ServiceDefinition.class);
+                new Query(Criteria.where("project_id").is(projectId).and("environment").is(environment)
+                        .and("name").is(name)), ServiceDefinition.class);
+    }
+
+    private static Query findStateQuery(String projectId, String environment, String serviceName) {
+        return new Query(Criteria.where("_id").is(ProcessState.idOf(projectId, environment, serviceName)));
     }
 
     private ProcessState findState(String projectId, String environment, String serviceName) {
@@ -150,13 +155,16 @@ public class ProcessStateController {
     }
 
     /**
-     * Makes sure the project knows the service, creating it on its first heartbeat. A heartbeat
+     * Makes sure the environment knows the service, creating it on its first heartbeat there. A heartbeat
      * that leaves out the process name or description keeps what is already there - services
      * report in constantly, and most of them only say "I'm up".
      */
-    private void registerDefinition(String projectId, String name, String processName, String description) {
-        Query query = new Query(Criteria.where("project_id").is(projectId).and("name").is(name));
-        Update update = new Update().setOnInsert("project_id", projectId).setOnInsert("name", name);
+    private void registerDefinition(String projectId, String environment, String name, String processName,
+                                    String description) {
+        Query query = new Query(Criteria.where("project_id").is(projectId).and("environment").is(environment)
+                .and("name").is(name));
+        Update update = new Update().setOnInsert("project_id", projectId).setOnInsert("environment", environment)
+                .setOnInsert("name", name);
         if (processName != null) {
             update.set("process_name", processName);
         }
@@ -190,10 +198,9 @@ public class ProcessStateController {
         }
     }
 
-    /** The state's id contains the service name, so a rename re-creates each environment's document. */
-    private void renameServiceInStates(String projectId, String oldName, String newName) {
-        List<ProcessState> states = mongoTemplate.find(
-                new Query(Criteria.where("project_id").is(projectId).and("service_name").is(oldName)),
+    /** The state's id contains the service name, so a rename re-creates the document. */
+    private void renameServiceInStates(String projectId, String environment, String oldName, String newName) {
+        List<ProcessState> states = mongoTemplate.find(findStateQuery(projectId, environment, oldName),
                 ProcessState.class);
         for (ProcessState state : states) {
             mongoTemplate.remove(state);
@@ -203,8 +210,8 @@ public class ProcessStateController {
         }
     }
 
-    private void renameServiceInConnections(String projectId, String oldName, String newName) {
-        Criteria inProject = Criteria.where("project_id").is(projectId);
+    private void renameServiceInConnections(String projectId, String environment, String oldName, String newName) {
+        Criteria inProject = Criteria.where("project_id").is(projectId).and("environment").is(environment);
         mongoTemplate.updateMulti(
                 new Query(new Criteria().andOperator(inProject, Criteria.where("source_service").is(oldName))),
                 new Update().set("source_service", newName), Connection.class);
@@ -213,10 +220,10 @@ public class ProcessStateController {
                 new Update().set("target_service", newName), Connection.class);
     }
 
-    /** Every connection of the project that has the service on either end. */
-    private static Criteria touching(String projectId, String serviceName) {
+    /** Every connection of the environment that has the service on either end. */
+    private static Criteria touching(String projectId, String environment, String serviceName) {
         return new Criteria().andOperator(
-                Criteria.where("project_id").is(projectId),
+                Criteria.where("project_id").is(projectId).and("environment").is(environment),
                 new Criteria().orOperator(
                         Criteria.where("source_service").is(serviceName),
                         Criteria.where("target_service").is(serviceName)));
@@ -228,7 +235,8 @@ public class ProcessStateController {
      * direction) to a name no longer in the list. {@code null} means "leave connections as they
      * are" (e.g. a heartbeat that doesn't mention connections at all).
      */
-    private void syncConnections(String projectId, String serviceName, List<String> desiredOtherNames) {
+    private void syncConnections(String projectId, String environment, String serviceName,
+                                 List<String> desiredOtherNames) {
         if (desiredOtherNames == null) {
             return;
         }
@@ -236,7 +244,8 @@ public class ProcessStateController {
                 .filter(name -> name != null && !name.isBlank() && !name.equals(serviceName))
                 .toList();
 
-        List<Connection> existing = mongoTemplate.find(new Query(touching(projectId, serviceName)), Connection.class);
+        List<Connection> existing = mongoTemplate.find(new Query(touching(projectId, environment, serviceName)),
+                Connection.class);
 
         for (Connection connection : existing) {
             String other = connection.getSourceService().equals(serviceName)
@@ -254,6 +263,7 @@ public class ProcessStateController {
             if (!exists) {
                 Connection connection = new Connection();
                 connection.setProjectId(projectId);
+                connection.setEnvironment(environment);
                 connection.setSourceService(serviceName);
                 connection.setTargetService(target);
                 connection.setDirection(ConnectionDirection.SOURCE_TO_TARGET);

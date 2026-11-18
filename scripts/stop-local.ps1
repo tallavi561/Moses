@@ -3,7 +3,7 @@
   Stops all locally running MoSes java services + the frontend dev server.
 #>
 
-$pattern = 'ingestion-service\.jar|search-service\.jar|process-monitor-service\.jar|ai-service\.jar|auth-service\.jar|api-gateway\.jar'
+$pattern = 'ingestion-service\.jar|search-service\.jar|process-monitor-service\.jar|ai-service\.jar|auth-service\.jar|chat-service\.jar|api-gateway\.jar'
 
 Get-CimInstance Win32_Process -Filter "Name='java.exe'" |
     Where-Object { $_.CommandLine -match $pattern } |

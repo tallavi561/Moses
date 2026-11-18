@@ -10,7 +10,7 @@ import java.time.Instant;
  * How one service is doing in one environment of its project: status, metrics, and the probe
  * that may be watching it there. One document per (project, environment, service), upserted on
  * every heartbeat. What the service is - its name and description - lives in
- * {@link ServiceDefinition} and is shared by all environments; edges are {@link Connection}s.
+ * {@link ServiceDefinition} in the same environment; edges are {@link Connection}s.
  */
 @Document(collection = "process_state")
 public class ProcessState {

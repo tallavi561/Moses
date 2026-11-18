@@ -25,3 +25,14 @@ moses:
     ttl-hours: ${JWT_TTL_HOURS:168}
   invites:
     ttl-days: ${INVITE_TTL_DAYS:7}
+  secrets:
+    # Encrypts the AI model API keys owners enter in Settings (AES-256-GCM). A long random string;
+    # changing it makes the stored keys unreadable (owners re-enter them). Without it the service
+    # runs but refuses to store keys.
+    encryption-key: ${SECRETS_ENCRYPTION_KEY:}
+  internal:
+    # Shared only between MoSes services, for /internal endpoints (ai-service reads the
+    # project's AI model key here). 32+ characters; same value on ai-service.
+    token: ${INTERNAL_API_TOKEN:}
+  ai-service:
+    url: ${AI_SERVICE_URL:http://localhost:8084}

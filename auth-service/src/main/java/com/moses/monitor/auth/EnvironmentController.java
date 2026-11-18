@@ -88,7 +88,7 @@ public class EnvironmentController {
     }
 
     /**
-     * Removes the environment and revokes its keys. The logs and service state already recorded
+     * Removes the environment, revokes its keys and forgets its own AI model setting. The logs and service state already recorded
      * under it are not deleted - they just stop being reachable (logs expire by retention).
      */
     @DeleteMapping("/api/projects/{projectId}/environments/{name}")
@@ -104,6 +104,8 @@ public class EnvironmentController {
             throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "a project needs at least one environment");
         }
         saveEnvironments(projectId, environments);
+        mongoTemplate.updateFirst(new Query(Criteria.where("_id").is(projectId)),
+                new Update().unset("environment_llm." + name), Project.class);
         mongoTemplate.remove(
                 new Query(Criteria.where("project_id").is(projectId).and("environment").is(name)), ApiKey.class);
         return environments;

@@ -122,10 +122,13 @@ public class AuthInterceptor implements HandlerInterceptor {
         return false;
     }
 
-    /** Monitoring data: everything that belongs to one environment of one project. */
+    /**
+     * Monitoring data (everything that belongs to one environment of one project), and the
+     * project's chat. A viewer may chat: sending a message is not a change to monitoring data.
+     */
     static boolean isScoped(String path) {
         return under(path, "/api/logs") || under(path, "/api/search")
-                || under(path, "/api/process") || under(path, "/api/ai");
+                || under(path, "/api/process") || under(path, "/api/ai") || under(path, "/api/chat");
     }
 
     /** The two things a monitored service does: send a log, report a heartbeat. */

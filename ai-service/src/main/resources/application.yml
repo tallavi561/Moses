@@ -1,5 +1,8 @@
 server:
   port: ${PORT:8084}
+  error:
+    # chat-service shows the agent's refusal reasons (no model configured, daily limit) in the chat.
+    include-message: always
 
 spring:
   threads:
@@ -13,15 +16,24 @@ moses:
     url: ${SEARCH_SERVICE_URL:http://localhost:8082}
   process-monitor:
     url: ${PROCESS_MONITOR_SERVICE_URL:http://localhost:8083}
-  # Language model used to understand free-text questions. Provider-agnostic: pick it by config.
-  #   LLM_PROVIDER: anthropic | openai-compatible | none (default: none -> rule-based translator)
-  #   LLM_MODEL:    model id for that provider (e.g. claude-opus-5-5, gpt-4o-mini, llama3.1)
-  #   LLM_API_KEY:  provider key (secret - set in the environment only)
-  #   LLM_BASE_URL: API root; required for openai-compatible (e.g. https://api.openai.com/v1),
-  #                 optional override for anthropic
+  # The language model (provider, model, API key) is not configured here: each project's owner
+  # sets it in MoSes Settings (optionally a different one per environment), auth-service stores
+  # it encrypted, and this service reads it per request (llm/ProjectLlmResolver).
+  auth-service:
+    url: ${AUTH_SERVICE_URL:http://localhost:8086}
+  internal:
+    # Shared secret for /internal endpoints between MoSes services (same value on auth-service).
+    token: ${INTERNAL_API_TOKEN:}
   llm:
-    provider: ${LLM_PROVIDER:none}
-    model: ${LLM_MODEL:}
-    api-key: ${LLM_API_KEY:}
-    base-url: ${LLM_BASE_URL:}
     timeout-seconds: ${LLM_TIMEOUT_SECONDS:20}
+    # One step of the chat agent (it may read code and logs before answering).
+    agent-timeout-seconds: ${LLM_AGENT_TIMEOUT_SECONDS:180}
+  # The chat agent (POST /internal/agent/reply, called by chat-service only).
+  agent:
+    # Model calls per answer before it gives up.
+    max-steps: ${AGENT_MAX_STEPS:15}
+    # Answers per project per UTC day - a guard against a runaway bill. Counted in memory,
+    # so a restart resets it.
+    daily-replies-per-project: ${AGENT_DAILY_REPLIES_PER_PROJECT:200}
+    # Where repositories are cloned (bare) for reading. Default: ~/.moses/repos
+    repo-cache-dir: ${AGENT_REPO_CACHE_DIR:}

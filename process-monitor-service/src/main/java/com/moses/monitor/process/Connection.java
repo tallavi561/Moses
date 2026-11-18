@@ -17,10 +17,14 @@ public class Connection {
     @Id
     private String id;
 
-    /** Connections describe the project's architecture, so they are shared by its environments. */
     @JsonIgnore
     @Field("project_id")
     private String projectId;
+
+    /** Each environment has its own architecture, so its own connections. */
+    @JsonIgnore
+    @Field("environment")
+    private String environment;
 
     @Field("source_service")
     private String sourceService;
@@ -54,6 +58,14 @@ public class Connection {
 
     public void setProjectId(String projectId) {
         this.projectId = projectId;
+    }
+
+    public String getEnvironment() {
+        return environment;
+    }
+
+    public void setEnvironment(String environment) {
+        this.environment = environment;
     }
 
     public String getSourceService() {

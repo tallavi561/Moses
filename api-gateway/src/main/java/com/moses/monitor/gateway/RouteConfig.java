@@ -19,7 +19,8 @@ public class RouteConfig {
                         @Value("${moses.routes.search-service}") String searchUrl,
                         @Value("${moses.routes.process-monitor-service}") String processUrl,
                         @Value("${moses.routes.ai-service}") String aiUrl,
-                        @Value("${moses.routes.auth-service}") String authUrl) {
+                        @Value("${moses.routes.auth-service}") String authUrl,
+                        @Value("${moses.routes.chat-service}") String chatUrl) {
         routes.put("/api/auth", normalize(authUrl));
         routes.put("/api/projects", normalize(authUrl));
         routes.put("/api/invites", normalize(authUrl));
@@ -27,6 +28,7 @@ public class RouteConfig {
         routes.put("/api/search", normalize(searchUrl));
         routes.put("/api/process", normalize(processUrl));
         routes.put("/api/ai", normalize(aiUrl));
+        routes.put("/api/chat", normalize(chatUrl));
     }
 
     /** Returns the backend base URL for the given request path, or null if no prefix matches. */
