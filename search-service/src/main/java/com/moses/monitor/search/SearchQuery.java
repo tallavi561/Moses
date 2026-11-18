@@ -11,18 +11,20 @@ public class SearchQuery {
     private final Instant from;
     private final Instant to;
     private final Integer logLevel;
-    private final String serviceName;
+    private final List<String> serviceNames;
     private final String traceId;
 
     public SearchQuery(String projectId, String environment, List<String> words, Instant from, Instant to,
-                       Integer logLevel, String serviceName, String traceId) {
+                       Integer logLevel, List<String> serviceNames, String traceId) {
         this.projectId = projectId;
         this.environment = environment;
         this.words = words;
         this.from = from;
         this.to = to;
         this.logLevel = logLevel;
-        this.serviceName = serviceName == null || serviceName.isBlank() ? null : serviceName.trim();
+        this.serviceNames = serviceNames == null
+                ? null
+                : serviceNames.stream().filter(s -> s != null && !s.isBlank()).map(String::trim).toList();
         this.traceId = traceId == null || traceId.isBlank() ? null : traceId.trim();
     }
 
@@ -56,8 +58,8 @@ public class SearchQuery {
         return logLevel;
     }
 
-    /** Exact service name to restrict results to, or null for all services. */
-    public String getServiceName() {
-        return serviceName;
+    /** Service names to restrict results to (matches any of them), or null/empty for all services. */
+    public List<String> getServiceNames() {
+        return serviceNames;
     }
 }

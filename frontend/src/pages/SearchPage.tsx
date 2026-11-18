@@ -6,6 +6,7 @@ import { useServerLogs, type ServerQuery } from "../useServerLogs";
 import { LEVEL_CLASS, LEVEL_LABEL } from "../logLevels";
 import TraceView from "../components/TraceView";
 import InfoHint from "../components/InfoHint";
+import ServiceMultiSelect from "../components/ServiceMultiSelect";
 
 const PAGE_SIZE = 20;
 const FEED_REFRESH_MS = 10000;
@@ -309,7 +310,7 @@ export default function SearchPage() {
     }
   });
   const [wordsInput, setWordsInput] = useState("");
-  const [serviceFilter, setServiceFilter] = useState("");
+  const [serviceFilter, setServiceFilter] = useState<string[]>([]);
   const [serviceNames, setServiceNames] = useState<string[]>([]);
   const [nlQuestion, setNlQuestion] = useState("");
   const [structuredQuery, setStructuredQuery] = useState<ServerQuery | null>(null);
@@ -348,14 +349,14 @@ export default function SearchPage() {
       return;
     }
     const words = wordsInput.split(/\s+/).filter(Boolean);
-    if (words.length === 0 && !serviceFilter) {
+    if (words.length === 0 && serviceFilter.length === 0) {
       setError(t.search.needsWord);
       return;
     }
     setError(null);
     setLastMode("structured");
     setAiResults(null);
-    setStructuredQuery({ words, service: serviceFilter || undefined, nonce: Date.now() });
+    setStructuredQuery({ words, services: serviceFilter.length ? serviceFilter : undefined, nonce: Date.now() });
   }
 
   async function runNlQuery() {
@@ -498,19 +499,7 @@ export default function SearchPage() {
                   className="w-full bg-surface-container-highest text-on-surface font-code text-code-md pl-9 pr-3 py-space-sm rounded-xl focus:outline-none focus:ring-1 focus:ring-secondary placeholder:text-on-surface-variant"
                 />
               </div>
-              <select
-                value={serviceFilter}
-                onChange={(e) => setServiceFilter(e.target.value)}
-                aria-label={t.search.serviceFilter}
-                className="shrink-0 max-w-[12rem] bg-surface-container-highest text-on-surface font-body-md text-body-md px-space-sm py-space-sm rounded-xl focus:outline-none focus:ring-1 focus:ring-secondary"
-              >
-                <option value="">{t.search.allServices}</option>
-                {serviceNames.map((name) => (
-                  <option key={name} value={name}>
-                    {name}
-                  </option>
-                ))}
-              </select>
+              <ServiceMultiSelect services={serviceNames} selected={serviceFilter} onChange={setServiceFilter} />
               <button
                 className="shrink-0 flex items-center gap-1.5 px-space-md py-space-sm btn btn-primary disabled:opacity-40"
                 onClick={runStructuredSearch}

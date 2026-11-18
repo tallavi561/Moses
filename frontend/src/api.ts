@@ -96,6 +96,8 @@ export interface ApiKeyInfo {
   environment: string;
   prefix: string;
   createdAt: string;
+  /** The owner can show this key again (false for keys created before that was possible). */
+  revealable: boolean;
 }
 
 export interface CreatedApiKey extends ApiKeyInfo {
@@ -192,6 +194,14 @@ export async function fetchApiKeys(projectId: string): Promise<ApiKeyInfo[]> {
 export async function createApiKey(projectId: string, environment: string): Promise<CreatedApiKey> {
   const res = await postJson(`/api/projects/${encodeURIComponent(projectId)}/keys`, { environment });
   return (await expectOk(res, "Failed to create key")).json();
+}
+
+/** Owner only: the key itself, to copy it into a service's configuration. */
+export async function revealApiKey(projectId: string, keyId: string): Promise<string> {
+  const res = await apiFetch(
+    `${API_BASE_URL}/api/projects/${encodeURIComponent(projectId)}/keys/${encodeURIComponent(keyId)}/reveal`
+  );
+  return ((await (await expectOk(res, "Failed to show key")).json()) as { key: string }).key;
 }
 
 export async function revokeApiKey(projectId: string, keyId: string): Promise<ApiKeyInfo[]> {
@@ -293,7 +303,7 @@ export interface LogPageParams {
   words: string[];
   from: string;
   to: string;
-  service?: string;
+  services?: string[];
   before?: string;
   beforeId?: string;
   limit?: number;
@@ -305,7 +315,7 @@ export async function searchLogPage(p: LogPageParams): Promise<LogPage> {
   p.words.forEach((w) => params.append("words", w));
   params.append("from", p.from);
   params.append("to", p.to);
-  if (p.service) params.append("service", p.service);
+  p.services?.forEach((s) => params.append("service", s));
   if (p.before) params.append("before", p.before);
   if (p.beforeId) params.append("beforeId", p.beforeId);
   if (p.limit) params.append("limit", String(p.limit));

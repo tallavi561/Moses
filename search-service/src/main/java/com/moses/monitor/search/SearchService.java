@@ -150,8 +150,8 @@ public class SearchService {
         if (query.getLogLevel() != null) {
             conditions.add(Criteria.where("log_level").is(query.getLogLevel()));
         }
-        if (query.getServiceName() != null) {
-            conditions.add(Criteria.where("service_name").is(query.getServiceName()));
+        if (query.getServiceNames() != null && !query.getServiceNames().isEmpty()) {
+            conditions.add(Criteria.where("service_name").in(query.getServiceNames()));
         }
         if (query.getTraceId() != null) {
             conditions.add(Criteria.where("trace_id").is(query.getTraceId()));
@@ -227,8 +227,8 @@ public class SearchService {
         if (query.getLogLevel() != null) {
             criteria = criteria.and("log_level").is(query.getLogLevel());
         }
-        if (query.getServiceName() != null) {
-            criteria = criteria.and("service_name").is(query.getServiceName());
+        if (query.getServiceNames() != null && !query.getServiceNames().isEmpty()) {
+            criteria = criteria.and("service_name").in(query.getServiceNames());
         }
         if (query.getTraceId() != null) {
             criteria = criteria.and("trace_id").is(query.getTraceId());

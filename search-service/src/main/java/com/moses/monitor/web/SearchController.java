@@ -31,7 +31,7 @@ public class SearchController {
                                   @RequestParam Instant from,
                                   @RequestParam Instant to,
                                   @RequestParam(required = false) Integer logLevel,
-                                  @RequestParam(required = false) String service,
+                                  @RequestParam(required = false) List<String> service,
                                   @RequestParam(required = false) String traceId) {
         return searchService.search(
                 new SearchQuery(projectId, environment, words, from, to, logLevel, service, traceId));
@@ -52,7 +52,7 @@ public class SearchController {
                                @RequestParam Instant from,
                                @RequestParam Instant to,
                                @RequestParam(required = false) Integer logLevel,
-                               @RequestParam(required = false) String service,
+                               @RequestParam(required = false) List<String> service,
                                @RequestParam(required = false) String traceId,
                                @RequestParam(required = false) Instant before,
                                @RequestParam(required = false) String beforeId,

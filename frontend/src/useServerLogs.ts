@@ -6,7 +6,7 @@ export const CHUNK_SIZE = 100;
 
 export interface ServerQuery {
   words: string[];
-  service?: string;
+  services?: string[];
   /** Bump to force a fresh load of an otherwise identical query. */
   nonce?: number;
 }
@@ -64,7 +64,7 @@ export function useServerLogs(query: ServerQuery | null) {
     try {
       const page = await searchLogPage({
         words: q.words,
-        service: q.service,
+        services: q.services,
         from: mode === "refresh" ? new Date(now - DAY_MS).toISOString() : fromRef.current,
         to: new Date(now).toISOString(),
         before: last?.timestamp,
