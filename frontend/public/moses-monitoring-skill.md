@@ -322,6 +322,13 @@ staging instead of prod, use the staging key; nothing else changes.
    - This is the one other thing an API key may do beyond logs/heartbeats (see the response
      table above - the same status codes apply here, including a plain `400` if `scope` is
      missing or `serviceName` is missing for a `SERVICE` dashboard).
+   - These are **recommendations, not decisions**: MoSes marks every dashboard you create
+     this way as suggested by the integration agent (not written by the person), and the
+     project's own people can delete any of them at any time, or create their own
+     dashboards freely (any scope, any title, whenever they want) regardless of what you
+     asked for here. Don't treat "ask for the dashboards you think are worth watching" as
+     something that needs their approval first - just ask, and let them prune or add to it
+     afterwards.
 
 8. **Report back to the person running this** what you set up:
    - which services got heartbeats (and whether they report `cpuPercent`/`memoryMb`), and
@@ -329,7 +336,8 @@ staging instead of prod, use the staging key; nothing else changes.
    - where each service's README lives and what you wrote or changed in it;
    - where the `Logger` class lives, where the request-logging middleware was added, and
      how the `traceId` is propagated between services;
-   - which dashboards you asked for and why;
+   - which dashboards you asked for and why - note that these are only suggestions, shown
+     as such in MoSes, and the person is free to delete any of them or create their own;
    - which environments you wired, which config variables (`MOSES_URL`, `MOSES_API_KEY`)
      each deployment needs, and where they still have to put real keys - reminding them
      to create one key per environment under Settings -> Environments and keys;
