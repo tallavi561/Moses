@@ -94,8 +94,58 @@
   --shadow: 0 1px 2px rgba(80, 30, 30, 0.08), 0 1px 3px rgba(80, 30, 30, 0.08);
 }
 
+/*
+  Tokens that do not change between themes, so they are defined once. To make one differ per
+  theme, override it in the dark/light blocks above. Rule of thumb for the whole UI: no color,
+  shadow or palette literal outside this file (npm run check:tokens enforces it).
+*/
+:root {
+  /* Decorative */
+  --dot-grid: rgba(76, 215, 246, 0.25); /* dotted background of the login screen and architecture canvas */
+  --scrim: rgba(0, 0, 0, 0.6);          /* dimmed backdrop behind modals */
+  --logo-tile: #f4f4f7;                 /* light tile the black logo art sits on */
+  --stage: #0b0c0f;                     /* dark stage behind the big intro logo on the light theme */
+
+  /* Elevation */
+  --shadow-sm: 0 1px 2px 0 rgb(0 0 0 / 0.05);
+  --shadow-md: 0 4px 6px -1px rgb(0 0 0 / 0.1), 0 2px 4px -2px rgb(0 0 0 / 0.1);
+  --shadow-lg: 0 10px 15px -3px rgb(0 0 0 / 0.1), 0 4px 6px -4px rgb(0 0 0 / 0.1);
+  --shadow-xl: 0 20px 25px -5px rgb(0 0 0 / 0.1), 0 8px 10px -6px rgb(0 0 0 / 0.1);
+  --shadow-2xl: 0 25px 50px -12px rgb(0 0 0 / 0.25);
+  --shadow-inner: inset 0 2px 4px 0 rgb(0 0 0 / 0.05);
+  --shadow-bar: 0 1px 8px rgba(0, 0, 0, 0.3); /* sidebar and top bar */
+  --shadow-stage: 0 18px 48px rgb(0 0 0 / 0.25);
+
+  /* Categorical palette: one color per service in charts (trace timeline) */
+  --chart-1: #5b9bd5;
+  --chart-2: #ffc000;
+  --chart-3: #00b050;
+  --chart-4: #ed7d31;
+  --chart-5: #9e6bd1;
+  --chart-6: #26c6da;
+  --chart-7: #ef5b8f;
+  --chart-8: #a5a5a5;
+
+  /* Service status: change what "up" or "down" looks like here, everywhere at once.
+     <status>      = the dot / accent;  -text and -bg = the badge's text and background. */
+  --status-up: var(--secondary);
+  --status-up-text: var(--secondary);
+  --status-up-bg: var(--surface-container);
+  --status-degraded: var(--tertiary);
+  --status-degraded-text: var(--tertiary);
+  --status-degraded-bg: var(--tertiary-container);
+  --status-down: var(--primary-container);
+  --status-down-text: var(--on-primary-container);
+  --status-down-bg: var(--primary-container);
+  --status-unknown: var(--outline);
+  --status-unknown-text: var(--on-surface-variant);
+  --status-unknown-bg: var(--surface-container);
+}
+
 html {
-  font: 15px/1.5 "Inter", "Segoe UI", system-ui, -apple-system, "Arial Hebrew", Arial, sans-serif;
+  font-size: 15px;
+  line-height: 1.5;
+  font-family: theme("fontFamily.body"); /* tailwind.config.js; the web font files are loaded in index.html */
   color-scheme: dark;
 }
 
@@ -194,12 +244,41 @@ button {
 }
 /* On the light theme there is no dark page to blend into, so the logo gets its own dark stage. */
 html[data-theme="light"] .hero-logo {
-  background: #0b0c0f;
+  background: var(--stage);
   border-radius: 28px;
-  box-shadow: 0 18px 48px rgb(0 0 0 / 0.25);
+  box-shadow: var(--shadow-stage);
 }
 
 /* The intro and the idle loop overlap; only one may be visible (both are blended with the page). */
 .hero-logo__hidden {
   visibility: hidden;
+}
+
+/*
+ * Shared component styles: the pieces that used to be copy-pasted as long class strings.
+ * Utilities written next to them (padding, layout, a different radius...) still win, because
+ * Tailwind emits this layer before the utilities. Use:
+ *   buttons   btn btn-primary | btn btn-secondary     (+ padding/layout utilities)
+ *   surfaces  card, dropdown-panel
+ *   inputs    field
+ */
+@layer components {
+  .btn {
+    @apply rounded-xl font-headline text-headline-sm;
+  }
+  .btn-primary {
+    @apply bg-primary-container text-on-primary-container transition-all hover:bg-inverse-primary;
+  }
+  .btn-secondary {
+    @apply bg-surface-container-high text-on-surface transition-colors hover:bg-surface-bright;
+  }
+  .card {
+    @apply bg-surface-container-low rounded-2xl shadow-sm p-space-lg;
+  }
+  .dropdown-panel {
+    @apply bg-surface-container-low rounded-2xl shadow-2xl p-space-sm z-50 space-y-1;
+  }
+  .field {
+    @apply w-full bg-surface-container-highest text-on-surface text-body-md px-space-md py-space-sm rounded-xl placeholder:text-on-surface-variant focus:outline-none focus:ring-1 focus:ring-secondary;
+  }
 }

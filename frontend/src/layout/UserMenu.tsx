@@ -42,7 +42,7 @@ export default function UserMenu() {
       </button>
 
       {open && (
-        <div className="absolute right-0 top-[calc(100%+8px)] w-56 bg-surface-container-low rounded-2xl shadow-2xl p-space-sm z-50 space-y-1">
+        <div className="absolute right-0 top-[calc(100%+8px)] w-56 dropdown-panel">
           <div className="px-space-sm py-space-xs">
             <div className="font-headline text-headline-sm text-on-surface">{user.name}</div>
             <div className="font-body-sm text-body-sm text-on-surface-variant">{user.email}</div>

@@ -23,8 +23,6 @@ interface EditNodeFormProps {
 
 const STATUSES: ProcessState["status"][] = ["UP", "DEGRADED", "DOWN", "UNKNOWN"];
 
-const inputClass =
-  "w-full bg-surface-container-highest text-on-surface font-body-md text-body-md px-space-md py-space-sm rounded-xl focus:outline-none focus:ring-1 focus:ring-secondary placeholder:text-on-surface-variant";
 const selectClass =
   "bg-surface-container-highest text-on-surface font-body-md text-body-md px-space-sm py-space-sm rounded-xl focus:outline-none focus:ring-1 focus:ring-secondary cursor-pointer";
 
@@ -87,7 +85,7 @@ export default function EditNodeForm({ node, otherServiceNames, initialConnectio
           autoFocus
           value={name}
           onChange={(e) => setName(e.target.value)}
-          className={`${inputClass} flex-1`}
+          className={`field flex-1`}
         />
         <select
           className={selectClass}
@@ -105,7 +103,7 @@ export default function EditNodeForm({ node, otherServiceNames, initialConnectio
       <div className="flex flex-col gap-space-xs">
         <div className="font-label-md text-label-md text-on-surface-variant uppercase">{t.flow.nodeDescription}</div>
         <textarea
-          className={`${inputClass} min-h-[70px] resize-y`}
+          className={`field min-h-[70px] resize-y`}
           value={description}
           onChange={(e) => setDescription(e.target.value)}
           placeholder={t.flow.nodeDescriptionPlaceholder}
@@ -120,7 +118,7 @@ export default function EditNodeForm({ node, otherServiceNames, initialConnectio
           value={probeUrl}
           onChange={(e) => setProbeUrl(e.target.value)}
           placeholder={t.flow.probeUrlPlaceholder}
-          className={inputClass}
+          className="field"
         />
         {probeStatusLabel(node, t) && (
           <p className="flex items-center gap-1 font-code text-code-sm text-on-surface-variant bg-surface-container rounded-lg px-space-sm py-1.5">
@@ -144,7 +142,7 @@ export default function EditNodeForm({ node, otherServiceNames, initialConnectio
       <div className="flex items-center justify-between gap-space-sm pt-space-xs">
         <div className="flex items-center gap-space-sm">
           <button
-            className="flex items-center gap-1.5 px-space-md py-space-sm rounded-xl bg-primary-container hover:bg-inverse-primary text-on-primary-container font-headline text-headline-sm transition-all disabled:opacity-40"
+            className="flex items-center gap-1.5 px-space-md py-space-sm btn btn-primary disabled:opacity-40"
             onClick={handleSave}
             disabled={submitting}
             type="button"
@@ -153,7 +151,7 @@ export default function EditNodeForm({ node, otherServiceNames, initialConnectio
             {t.flow.save}
           </button>
           <button
-            className="px-space-md py-space-sm rounded-xl bg-surface-container-high hover:bg-surface-bright text-on-surface font-headline text-headline-sm transition-colors disabled:opacity-40"
+            className="px-space-md py-space-sm btn btn-secondary disabled:opacity-40"
             onClick={onClose}
             disabled={submitting}
             type="button"
@@ -174,7 +172,7 @@ export default function EditNodeForm({ node, otherServiceNames, initialConnectio
               {t.flow.delete}
             </button>
             <button
-              className="px-space-sm py-1.5 rounded-xl bg-surface-container-high hover:bg-surface-bright text-on-surface font-headline text-headline-sm transition-colors"
+              className="px-space-sm py-1.5 btn btn-secondary"
               onClick={() => setConfirmingDelete(false)}
               disabled={submitting}
               type="button"

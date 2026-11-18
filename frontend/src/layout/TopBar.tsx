@@ -1,7 +1,6 @@
 import { useLanguage } from "../i18n/LanguageContext";
 import { Icon } from "../icons";
 import UserMenu from "./UserMenu";
-import EnvironmentSwitcher from "./EnvironmentSwitcher";
 import type { SidebarState } from "./useSidebarState";
 
 interface TopBarProps {
@@ -20,7 +19,7 @@ export default function TopBar({ sidebarState, onShowSidebar }: TopBarProps) {
 
   return (
     <header
-      className={`fixed top-0 right-0 h-16 z-40 bg-surface-container-lowest/80 backdrop-blur-xl shadow-[0_1px_8px_rgba(0,0,0,0.3)] transition-[left] duration-200 ${LEFT[sidebarState]}`}
+      className={`fixed top-0 right-0 h-16 z-40 bg-surface-container-lowest/80 backdrop-blur-xl shadow-bar transition-[left] duration-200 ${LEFT[sidebarState]}`}
     >
       <div className="h-16 w-full px-space-md flex items-center justify-between gap-space-md">
         <div>
@@ -37,7 +36,6 @@ export default function TopBar({ sidebarState, onShowSidebar }: TopBarProps) {
         </div>
 
         <div className="flex items-center gap-space-md">
-          <EnvironmentSwitcher />
           <button
             className="flex items-center gap-space-xs px-space-sm py-1 rounded-xl bg-surface-container hover:bg-surface-container-high text-on-surface font-code text-code-sm transition-colors"
             onClick={toggleLang}

@@ -11,6 +11,7 @@ import SearchPage from "./pages/SearchPage";
 import FlowPage from "./pages/FlowPage";
 import SettingsPage from "./pages/SettingsPage";
 import JoinPage from "./pages/JoinPage";
+import ChatPage from "./pages/ChatPage";
 import ComingSoonPage from "./pages/ComingSoonPage";
 import "./App.css";
 
@@ -29,6 +30,7 @@ export default function App() {
 
                 <Route path="/p/:projectId" element={<Layout />}>
                   <Route index element={<Navigate to="search" replace />} />
+                  <Route path="chat" element={<ChatPage />} />
                   <Route path="search" element={<SearchPage />} />
                   <Route path="flow" element={<FlowPage />} />
                   <Route path="dashboard" element={<ComingSoonPage />} />

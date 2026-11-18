@@ -69,7 +69,7 @@ export default function LoginPage() {
       <div
         className="absolute inset-0 pointer-events-none opacity-20"
         style={{
-          backgroundImage: "radial-gradient(rgba(76,215,246,0.25) 1px, transparent 1px)",
+          backgroundImage: "radial-gradient(var(--dot-grid) 1px, transparent 1px)",
           backgroundSize: "28px 28px",
         }}
       />
@@ -132,7 +132,7 @@ export default function LoginPage() {
           )}
 
           <button
-            className="w-full flex items-center justify-center gap-space-sm py-space-sm px-space-md rounded-xl bg-primary-container hover:bg-inverse-primary text-on-primary-container font-headline text-headline-sm transition-all shadow-md disabled:opacity-50"
+            className="w-full flex items-center justify-center gap-space-sm py-space-sm px-space-md btn btn-primary shadow-md disabled:opacity-50"
             disabled={busy}
             type="submit"
           >

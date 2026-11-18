@@ -462,7 +462,7 @@ export default function SearchPage() {
         </button>
       </div>
 
-      <div className="bg-surface-container-low rounded-2xl shadow-sm p-space-lg">
+      <div className="card">
         {searchMode === "structured" ? (
           <>
             <div className="flex items-center gap-space-xs">
@@ -512,7 +512,7 @@ export default function SearchPage() {
                 ))}
               </select>
               <button
-                className="shrink-0 flex items-center gap-1.5 px-space-md py-space-sm rounded-xl bg-primary-container hover:bg-inverse-primary text-on-primary-container font-headline text-headline-sm transition-all disabled:opacity-40"
+                className="shrink-0 flex items-center gap-1.5 px-space-md py-space-sm btn btn-primary disabled:opacity-40"
                 onClick={runStructuredSearch}
                 disabled={search.loading && !search.loaded}
                 type="button"
@@ -546,7 +546,7 @@ export default function SearchPage() {
                 />
               </div>
               <button
-                className="shrink-0 flex items-center gap-1.5 px-space-md py-space-sm rounded-xl bg-surface-container-high hover:bg-surface-bright text-on-surface font-headline text-headline-sm transition-colors disabled:opacity-40"
+                className="shrink-0 flex items-center gap-1.5 px-space-md py-space-sm btn btn-secondary disabled:opacity-40"
                 onClick={runNlQuery}
                 disabled={aiLoading}
                 type="button"
@@ -569,7 +569,7 @@ export default function SearchPage() {
       {traceId && <TraceView traceId={traceId} onClose={() => setTraceId(null)} />}
 
       {showFeed && !feed.loaded && (
-        <div className="bg-surface-container-low rounded-2xl shadow-sm p-space-lg">
+        <div className="card">
           <h2 className="font-headline text-headline-md text-on-surface mb-space-sm">{t.search.recentTitle}</h2>
           {feed.error ? (
             <div className="flex items-center gap-space-sm flex-wrap font-body-md text-body-md text-error">
@@ -590,7 +590,7 @@ export default function SearchPage() {
       )}
 
       {showFeed && feed.loaded && (
-        <div className="bg-surface-container-low rounded-2xl shadow-sm p-space-lg">
+        <div className="card">
           <div className="flex items-center justify-between mb-space-sm">
             <h2 className="font-headline text-headline-md text-on-surface">{t.search.recentTitle}</h2>
             <span className="font-code text-code-sm text-on-surface-variant bg-surface-container px-space-sm py-0.5 rounded-full">
@@ -616,7 +616,7 @@ export default function SearchPage() {
       )}
 
       {!showFeed && (
-        <div className="bg-surface-container-low rounded-2xl shadow-sm p-space-lg">
+        <div className="card">
           <div className="flex items-center justify-between mb-space-sm">
             <h2 className="font-headline text-headline-md text-on-surface">
               {showAi ? t.search.resultsTitleAi : t.search.resultsTitle}

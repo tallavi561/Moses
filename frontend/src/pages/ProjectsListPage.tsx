@@ -45,7 +45,7 @@ export default function ProjectsListPage() {
           </div>
           {user && (
             <button
-              className="flex items-center gap-1 px-space-md py-space-xs rounded-xl bg-surface-container-high hover:bg-surface-bright text-on-surface font-headline text-headline-sm transition-colors shrink-0"
+              className="flex items-center gap-1 px-space-md py-space-xs btn btn-secondary shrink-0"
               onClick={signOut}
               type="button"
             >
@@ -55,7 +55,7 @@ export default function ProjectsListPage() {
           )}
         </header>
 
-        <section className="bg-surface-container-low rounded-2xl shadow-sm p-space-lg">
+        <section className="card">
           <h2 className="font-headline text-headline-md text-on-surface mb-space-sm">{t.projects.title}</h2>
           {loading ? (
             <p className="font-body-md text-body-md text-on-surface-variant">{t.projects.loading}</p>
@@ -63,7 +63,7 @@ export default function ProjectsListPage() {
             <div className="flex items-center gap-space-md">
               <p className="font-body-md text-body-md text-error">{t.projects.loadFailed}</p>
               <button
-                className="px-space-md py-1.5 rounded-xl bg-surface-container-high hover:bg-surface-bright text-on-surface font-headline text-headline-sm transition-colors"
+                className="px-space-md py-1.5 btn btn-secondary"
                 onClick={() => void reload()}
                 type="button"
               >
@@ -84,7 +84,7 @@ export default function ProjectsListPage() {
                     <span className="font-body-lg text-body-lg text-on-surface truncate">{p.name}</span>
                   </div>
                   <button
-                    className="shrink-0 flex items-center gap-1 px-space-md py-1.5 rounded-xl bg-primary-container hover:bg-inverse-primary text-on-primary-container font-headline text-headline-sm transition-all"
+                    className="shrink-0 flex items-center gap-1 px-space-md py-1.5 btn btn-primary"
                     onClick={() => openProject(p.id)}
                     type="button"
                   >
@@ -97,7 +97,7 @@ export default function ProjectsListPage() {
           )}
         </section>
 
-        <section className="bg-surface-container-low rounded-2xl shadow-sm p-space-lg">
+        <section className="card">
           <h2 className="font-headline text-headline-md text-on-surface mb-space-sm">{t.projects.newProject}</h2>
           {creating ? (
             <div className="flex items-center gap-space-sm">
@@ -111,7 +111,7 @@ export default function ProjectsListPage() {
                 className="flex-1 min-w-0 bg-surface-container-highest text-on-surface font-body-md text-body-md px-space-md py-space-sm rounded-xl focus:outline-none focus:ring-1 focus:ring-secondary placeholder:text-on-surface-variant"
               />
               <button
-                className="shrink-0 px-space-md py-space-sm rounded-xl bg-primary-container hover:bg-inverse-primary text-on-primary-container font-headline text-headline-sm transition-all disabled:opacity-40"
+                className="shrink-0 px-space-md py-space-sm btn btn-primary disabled:opacity-40"
                 onClick={handleCreate}
                 disabled={!newName.trim()}
                 type="button"
@@ -119,7 +119,7 @@ export default function ProjectsListPage() {
                 {t.projects.create}
               </button>
               <button
-                className="shrink-0 px-space-md py-space-sm rounded-xl bg-surface-container-high hover:bg-surface-bright text-on-surface font-headline text-headline-sm transition-colors"
+                className="shrink-0 px-space-md py-space-sm btn btn-secondary"
                 onClick={() => {
                   setCreating(false);
                   setNewName("");
@@ -131,7 +131,7 @@ export default function ProjectsListPage() {
             </div>
           ) : (
             <button
-              className="flex items-center gap-1.5 px-space-md py-space-sm rounded-xl bg-surface-container-high hover:bg-surface-bright text-on-surface font-headline text-headline-sm transition-colors"
+              className="flex items-center gap-1.5 px-space-md py-space-sm btn btn-secondary"
               onClick={() => setCreating(true)}
               type="button"
             >

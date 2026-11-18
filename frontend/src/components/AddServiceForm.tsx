@@ -17,8 +17,6 @@ interface AddServiceFormProps {
 
 const STATUSES: ProcessState["status"][] = ["UP", "DEGRADED", "DOWN", "UNKNOWN"];
 
-const inputClass =
-  "w-full bg-surface-container-highest text-on-surface font-body-md text-body-md px-space-md py-space-sm rounded-xl focus:outline-none focus:ring-1 focus:ring-secondary placeholder:text-on-surface-variant";
 const selectClass =
   "bg-surface-container-highest text-on-surface font-body-md text-body-md px-space-sm py-space-sm rounded-xl focus:outline-none focus:ring-1 focus:ring-secondary cursor-pointer";
 
@@ -64,7 +62,7 @@ export default function AddServiceForm({ existingServices, onAdd }: AddServiceFo
   if (!open) {
     return (
       <button
-        className="self-start flex items-center gap-1.5 px-space-md py-space-sm rounded-xl bg-primary-container hover:bg-inverse-primary text-on-primary-container font-headline text-headline-sm transition-all shadow-md"
+        className="self-start flex items-center gap-1.5 px-space-md py-space-sm btn btn-primary shadow-md"
         onClick={() => setOpen(true)}
         type="button"
       >
@@ -75,7 +73,7 @@ export default function AddServiceForm({ existingServices, onAdd }: AddServiceFo
   }
 
   return (
-    <div className="bg-surface-container-low rounded-2xl shadow-sm p-space-lg flex flex-col gap-space-md">
+    <div className="card flex flex-col gap-space-md">
       <div>
         <h2 className="font-headline text-headline-md text-on-surface">{t.flow.addServiceTitle}</h2>
         <p className="font-body-sm text-body-sm text-on-surface-variant mt-space-xs">{t.flow.addServiceHint}</p>
@@ -89,7 +87,7 @@ export default function AddServiceForm({ existingServices, onAdd }: AddServiceFo
           onChange={(e) => setName(e.target.value)}
           onKeyDown={(e) => e.key === "Enter" && handleSubmit()}
           placeholder={t.flow.serviceNamePlaceholder}
-          className={`${inputClass} flex-1`}
+          className={`field flex-1`}
         />
         <select
           className={selectClass}
@@ -107,7 +105,7 @@ export default function AddServiceForm({ existingServices, onAdd }: AddServiceFo
       <div className="flex flex-col gap-space-xs">
         <div className="font-label-md text-label-md text-on-surface-variant uppercase">{t.flow.nodeDescription}</div>
         <textarea
-          className={`${inputClass} min-h-[70px] resize-y`}
+          className={`field min-h-[70px] resize-y`}
           value={description}
           onChange={(e) => setDescription(e.target.value)}
           placeholder={t.flow.nodeDescriptionPlaceholder}
@@ -122,7 +120,7 @@ export default function AddServiceForm({ existingServices, onAdd }: AddServiceFo
           value={probeUrl}
           onChange={(e) => setProbeUrl(e.target.value)}
           placeholder={t.flow.probeUrlPlaceholder}
-          className={inputClass}
+          className="field"
         />
       </div>
 
@@ -139,7 +137,7 @@ export default function AddServiceForm({ existingServices, onAdd }: AddServiceFo
 
       <div className="flex items-center gap-space-sm">
         <button
-          className="flex items-center gap-1.5 px-space-md py-space-sm rounded-xl bg-primary-container hover:bg-inverse-primary text-on-primary-container font-headline text-headline-sm transition-all disabled:opacity-40"
+          className="flex items-center gap-1.5 px-space-md py-space-sm btn btn-primary disabled:opacity-40"
           onClick={handleSubmit}
           disabled={submitting}
           type="button"
@@ -148,7 +146,7 @@ export default function AddServiceForm({ existingServices, onAdd }: AddServiceFo
           {t.flow.add}
         </button>
         <button
-          className="flex items-center gap-1.5 px-space-md py-space-sm rounded-xl bg-surface-container-high hover:bg-surface-bright text-on-surface font-headline text-headline-sm transition-colors disabled:opacity-40"
+          className="flex items-center gap-1.5 px-space-md py-space-sm btn btn-secondary disabled:opacity-40"
           onClick={reset}
           disabled={submitting}
           type="button"

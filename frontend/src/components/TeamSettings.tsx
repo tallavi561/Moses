@@ -121,7 +121,7 @@ export default function TeamSettings() {
   }
 
   return (
-    <div className="bg-surface-container-low rounded-2xl shadow-sm p-space-lg">
+    <div className="card">
       <h2 className="font-headline text-headline-md text-on-surface">{t.team.title}</h2>
       <p className="font-body-sm text-body-sm text-on-surface-variant mt-space-xs mb-space-md">{t.team.hint}</p>
 
@@ -202,7 +202,7 @@ export default function TeamSettings() {
                 <option value="VIEWER">{t.team.roleViewer}</option>
               </select>
               <button
-                className="shrink-0 px-space-md py-space-sm rounded-xl bg-primary-container hover:bg-inverse-primary text-on-primary-container font-headline text-headline-sm transition-all disabled:opacity-40"
+                className="shrink-0 px-space-md py-space-sm btn btn-primary disabled:opacity-40"
                 disabled={!email.trim() || adding}
                 type="submit"
               >
@@ -228,7 +228,7 @@ export default function TeamSettings() {
                   value={inviteLink}
                 />
                 <button
-                  className="shrink-0 flex items-center gap-1 px-space-md py-space-sm rounded-xl bg-surface-container-high hover:bg-surface-bright text-on-surface font-headline text-headline-sm transition-colors"
+                  className="shrink-0 flex items-center gap-1 px-space-md py-space-sm btn btn-secondary"
                   onClick={handleCopy}
                   type="button"
                 >
@@ -238,7 +238,7 @@ export default function TeamSettings() {
               </div>
             )}
             <button
-              className="w-fit flex items-center gap-1.5 px-space-md py-space-sm rounded-xl bg-surface-container-high hover:bg-surface-bright text-on-surface font-headline text-headline-sm transition-colors"
+              className="w-fit flex items-center gap-1.5 px-space-md py-space-sm btn btn-secondary"
               onClick={handleCreateInvite}
               type="button"
             >

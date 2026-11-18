@@ -1,6 +1,6 @@
 import { getSession, setSession, type Session, type SessionUser } from "./auth/session";
 
-const API_BASE_URL = import.meta.env.VITE_API_BASE_URL ?? "http://localhost:8080";
+export const API_BASE_URL = import.meta.env.VITE_API_BASE_URL ?? "http://localhost:8080";
 
 /** A failed API call, carrying the HTTP status so screens can show the right message. */
 export class ApiError extends Error {
@@ -86,6 +86,8 @@ export interface Project {
   memberCount: number;
   /** Never empty: a project always has at least one environment. */
   environments: string[];
+  /** https://github.com/<owner>/<repo>, read by the chat agent; null until the owner sets it. */
+  repoUrl: string | null;
 }
 
 /** A key a monitored service reports in with. The key itself is only ever returned on creation. */
@@ -124,6 +126,16 @@ export async function fetchProjects(): Promise<Project[]> {
 
 export async function createProject(name: string): Promise<Project> {
   return (await expectOk(await postJson("/api/projects", { name }), "Failed to create project")).json();
+}
+
+/** Owner only. An empty string disconnects the repository. */
+export async function setProjectRepo(projectId: string, repoUrl: string): Promise<Project> {
+  const res = await apiFetch(`${API_BASE_URL}/api/projects/${encodeURIComponent(projectId)}/repo`, {
+    method: "PUT",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ repoUrl }),
+  });
+  return (await expectOk(res, "Failed to save the repository")).json();
 }
 
 export async function fetchMembers(projectId: string): Promise<ProjectMember[]> {
@@ -420,4 +432,127 @@ export async function askAi(question: string): Promise<AiQueryResponse> {
   });
   if (!res.ok) throw new Error(`AI query failed: ${res.status}`);
   return res.json();
+}
+
+// ---- team chat ----
+
+/** "team" (everyone in the project) or the signed-in user's private channel with the agent. */
+export type ChatChannel = string;
+
+export interface ChatReplyPreview {
+  id: string;
+  authorName: string;
+  authorType: "USER" | "AGENT";
+  text: string;
+}
+
+export interface ChatMessage {
+  id: string;
+  projectId: string;
+  channel: ChatChannel;
+  authorType: "USER" | "AGENT";
+  authorId: string;
+  authorName: string;
+  text: string;
+  replyTo: ChatReplyPreview | null;
+  /** The agent could not answer; the text says why. */
+  failed: boolean;
+  createdAt: string;
+}
+
+export interface ChatPage {
+  /** Oldest first. */
+  messages: ChatMessage[];
+  hasMore: boolean;
+}
+
+export interface ChatIdentity {
+  userId: string;
+  privateChannel: ChatChannel;
+  projectId: string;
+}
+
+export async function fetchChatIdentity(): Promise<ChatIdentity> {
+  return (await expectOk(await apiFetch(`${API_BASE_URL}/api/chat/me`), "Chat unavailable")).json();
+}
+
+export async function fetchChatMessages(channel: ChatChannel, before?: string): Promise<ChatPage> {
+  const params = new URLSearchParams({ channel, limit: "50" });
+  if (before) params.set("before", before);
+  const res = await apiFetch(`${API_BASE_URL}/api/chat/messages?${params.toString()}`);
+  return (await expectOk(res, "Failed to load messages")).json();
+}
+
+export async function sendChatMessage(channel: ChatChannel, text: string, replyToId?: string): Promise<ChatMessage> {
+  const res = await postJson("/api/chat/messages", { channel, text, replyToId });
+  return (await expectOk(res, "Failed to send")).json();
+}
+
+// ---- the AI model a project's agent uses ----
+
+export type LlmProvider = "anthropic" | "openai-compatible";
+
+/** What members see of a model setting - never the key itself, only its last 4 characters. */
+export interface LlmView {
+  provider: LlmProvider;
+  model: string;
+  baseUrl: string | null;
+  keyHint: string;
+  updatedAt: string;
+}
+
+export interface LlmOverview {
+  /** The default for every environment; null until the owner sets one. */
+  project: LlmView | null;
+  /** Per environment: its own setting, or null when it uses the project default. */
+  environments: Record<string, LlmView | null>;
+  /** False when the server has no encryption key configured and cannot store keys. */
+  canStoreKeys: boolean;
+}
+
+export interface LlmInput {
+  provider: LlmProvider;
+  model: string;
+  /** Empty keeps the stored key (to change only the model). */
+  apiKey: string;
+  baseUrl?: string;
+}
+
+function llmPath(projectId: string, environment?: string) {
+  const base = `${API_BASE_URL}/api/projects/${encodeURIComponent(projectId)}`;
+  return environment ? `${base}/environments/${encodeURIComponent(environment)}/llm` : `${base}/llm`;
+}
+
+/** The provider's reason (e.g. "Anthropic rejected this API key.") when it refused the key. */
+async function llmResult(res: Response, what: string): Promise<LlmOverview> {
+  if (!res.ok) {
+    let message = `${what}: ${res.status}`;
+    try {
+      const body = await res.json();
+      if (body?.message) message = body.message;
+    } catch {
+      // not JSON
+    }
+    throw new ApiError(message, res.status);
+  }
+  return res.json();
+}
+
+export async function fetchLlmOverview(projectId: string): Promise<LlmOverview> {
+  return llmResult(await apiFetch(llmPath(projectId)), "Failed to load the AI model");
+}
+
+/** Owner only. `environment` set = that environment's own model; otherwise the project default. */
+export async function saveLlm(projectId: string, input: LlmInput, environment?: string): Promise<LlmOverview> {
+  const res = await apiFetch(llmPath(projectId, environment), {
+    method: "PUT",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(input),
+  });
+  return llmResult(res, "Failed to save the AI model");
+}
+
+/** Owner only. For an environment: back to the project default. */
+export async function clearLlm(projectId: string, environment?: string): Promise<LlmOverview> {
+  return llmResult(await apiFetch(llmPath(projectId, environment), { method: "DELETE" }), "Failed to remove the AI model");
 }

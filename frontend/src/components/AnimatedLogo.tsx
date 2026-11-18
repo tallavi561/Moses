@@ -42,7 +42,7 @@ export default function AnimatedLogo({ size = 40, className = "" }: AnimatedLogo
   const inner = Math.round(size * 0.84);
   return (
     <div
-      className={`shrink-0 flex items-center justify-center bg-[#f4f4f7] shadow-md ${className}`}
+      className={`shrink-0 flex items-center justify-center bg-logo-tile shadow-md ${className}`}
       style={{ width: size, height: size, borderRadius: Math.round(size * 0.22) }}
       role="img"
       aria-label="MoSes Monitor"

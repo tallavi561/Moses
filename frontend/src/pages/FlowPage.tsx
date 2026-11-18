@@ -31,20 +31,7 @@ import ArchitectureListView from "../components/ArchitectureListView";
 import NodeMetrics from "../components/NodeMetrics";
 import { Icon } from "../icons";
 import { probeStatusLabel } from "../probeStatus";
-
-const STATUS_DOT: Record<ProcessState["status"], string> = {
-  UP: "bg-secondary",
-  DEGRADED: "bg-tertiary",
-  DOWN: "bg-primary-container",
-  UNKNOWN: "bg-outline",
-};
-
-const STATUS_BADGE: Record<ProcessState["status"], string> = {
-  UP: "bg-surface-container text-secondary",
-  DEGRADED: "bg-tertiary-container/20 text-tertiary",
-  DOWN: "bg-primary-container text-on-primary-container",
-  UNKNOWN: "bg-surface-container text-on-surface-variant",
-};
+import { STATUS_BADGE, STATUS_DOT } from "../statusStyles";
 
 type ViewMode = "graph" | "list";
 
@@ -320,25 +307,25 @@ export default function FlowPage() {
           {!loading && !error && states.length > 0 && (
             <div className="flex flex-wrap items-center gap-space-xs">
               <span className="flex items-center gap-1.5 px-space-sm py-1 rounded-xl bg-surface-container shadow-sm">
-                <span className="w-2 h-2 rounded-full bg-secondary" />
-                <span className="font-label-sm text-label-sm text-secondary font-bold">{upCount} {t.flow.status.UP}</span>
+                <span className="w-2 h-2 rounded-full bg-status-up" />
+                <span className="font-label-sm text-label-sm text-status-up-text font-bold">{upCount} {t.flow.status.UP}</span>
               </span>
               {degradedCount > 0 && (
                 <span className="flex items-center gap-1.5 px-space-sm py-1 rounded-xl bg-surface-container shadow-sm">
-                  <span className="w-2 h-2 rounded-full bg-tertiary animate-pulse" />
-                  <span className="font-label-sm text-label-sm text-tertiary font-bold">{degradedCount} {t.flow.status.DEGRADED}</span>
+                  <span className="w-2 h-2 rounded-full bg-status-degraded animate-pulse" />
+                  <span className="font-label-sm text-label-sm text-status-degraded-text font-bold">{degradedCount} {t.flow.status.DEGRADED}</span>
                 </span>
               )}
               {downCount > 0 && (
-                <span className="flex items-center gap-1.5 px-space-sm py-1 rounded-xl bg-primary-container text-on-primary-container shadow-sm">
-                  <span className="w-2 h-2 rounded-full bg-on-primary-container" />
+                <span className="flex items-center gap-1.5 px-space-sm py-1 rounded-xl bg-status-down-bg text-status-down-text shadow-sm">
+                  <span className="w-2 h-2 rounded-full bg-status-down-text" />
                   <span className="font-label-sm text-label-sm font-bold">{downCount} {t.flow.status.DOWN}</span>
                 </span>
               )}
               {unknownCount > 0 && (
                 <span className="flex items-center gap-1.5 px-space-sm py-1 rounded-xl bg-surface-container shadow-sm">
-                  <span className="w-2 h-2 rounded-full bg-outline" />
-                  <span className="font-label-sm text-label-sm text-on-surface-variant">{unknownCount} {t.flow.status.UNKNOWN}</span>
+                  <span className="w-2 h-2 rounded-full bg-status-unknown" />
+                  <span className="font-label-sm text-label-sm text-status-unknown-text">{unknownCount} {t.flow.status.UNKNOWN}</span>
                 </span>
               )}
             </div>
@@ -406,7 +393,7 @@ export default function FlowPage() {
             <div
               className="absolute inset-0 pointer-events-none opacity-20 z-0"
               style={{
-                backgroundImage: "radial-gradient(rgba(76,215,246,0.25) 1px, transparent 1px)",
+                backgroundImage: "radial-gradient(var(--dot-grid) 1px, transparent 1px)",
                 backgroundSize: "28px 28px",
               }}
             />

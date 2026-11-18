@@ -42,6 +42,32 @@ export default {
         "on-error": "var(--on-error)",
         "error-container": "var(--error-container)",
         "on-error-container": "var(--on-error-container)",
+
+        // Decorative and status colors (values live in src/index.css)
+        scrim: "var(--scrim)",
+        "logo-tile": "var(--logo-tile)",
+        stage: "var(--stage)",
+        "status-up": "var(--status-up)",
+        "status-up-text": "var(--status-up-text)",
+        "status-up-bg": "var(--status-up-bg)",
+        "status-degraded": "var(--status-degraded)",
+        "status-degraded-text": "var(--status-degraded-text)",
+        "status-degraded-bg": "var(--status-degraded-bg)",
+        "status-down": "var(--status-down)",
+        "status-down-text": "var(--status-down-text)",
+        "status-down-bg": "var(--status-down-bg)",
+        "status-unknown": "var(--status-unknown)",
+        "status-unknown-text": "var(--status-unknown-text)",
+        "status-unknown-bg": "var(--status-unknown-bg)",
+      },
+      boxShadow: {
+        sm: "var(--shadow-sm)",
+        md: "var(--shadow-md)",
+        lg: "var(--shadow-lg)",
+        xl: "var(--shadow-xl)",
+        "2xl": "var(--shadow-2xl)",
+        inner: "var(--shadow-inner)",
+        bar: "var(--shadow-bar)",
       },
       borderRadius: {
         DEFAULT: "0.25rem",
@@ -63,7 +89,8 @@ export default {
       },
       fontFamily: {
         headline: ["Plus Jakarta Sans", "sans-serif"],
-        body: ["Inter", "sans-serif"],
+        // The full stack: it is also the page default (src/index.css). Web font files: index.html.
+        body: ["Inter", "Segoe UI", "system-ui", "-apple-system", "Arial Hebrew", "Arial", "sans-serif"],
         code: ["JetBrains Mono", "monospace"],
       },
       fontSize: {

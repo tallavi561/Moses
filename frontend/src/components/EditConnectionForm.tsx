@@ -11,8 +11,6 @@ interface EditConnectionFormProps {
   onClose: () => void;
 }
 
-const inputClass =
-  "w-full bg-surface-container-highest text-on-surface font-body-md text-body-md px-space-md py-space-sm rounded-xl focus:outline-none focus:ring-1 focus:ring-secondary placeholder:text-on-surface-variant";
 const selectClass =
   "w-full bg-surface-container-highest text-on-surface font-body-md text-body-md px-space-md py-space-sm rounded-xl focus:outline-none focus:ring-1 focus:ring-secondary cursor-pointer";
 
@@ -87,14 +85,14 @@ export default function EditConnectionForm({ connection, onSave, onDelete, onClo
           value={communicationType}
           onChange={(e) => setCommunicationType(e.target.value)}
           placeholder={t.flow.communicationTypePlaceholder}
-          className={inputClass}
+          className="field"
         />
       </div>
 
       <div className="flex flex-col gap-space-xs">
         <div className="font-label-md text-label-md text-on-surface-variant uppercase">{t.flow.description}</div>
         <textarea
-          className={`${inputClass} min-h-[70px] resize-y`}
+          className={`field min-h-[70px] resize-y`}
           value={description}
           onChange={(e) => setDescription(e.target.value)}
           placeholder={t.flow.descriptionPlaceholder}
@@ -111,7 +109,7 @@ export default function EditConnectionForm({ connection, onSave, onDelete, onClo
       <div className="flex items-center justify-between gap-space-sm pt-space-xs">
         <div className="flex items-center gap-space-sm">
           <button
-            className="flex items-center gap-1.5 px-space-md py-space-sm rounded-xl bg-primary-container hover:bg-inverse-primary text-on-primary-container font-headline text-headline-sm transition-all disabled:opacity-40"
+            className="flex items-center gap-1.5 px-space-md py-space-sm btn btn-primary disabled:opacity-40"
             onClick={handleSave}
             disabled={submitting}
             type="button"
@@ -120,7 +118,7 @@ export default function EditConnectionForm({ connection, onSave, onDelete, onClo
             {t.flow.save}
           </button>
           <button
-            className="px-space-md py-space-sm rounded-xl bg-surface-container-high hover:bg-surface-bright text-on-surface font-headline text-headline-sm transition-colors disabled:opacity-40"
+            className="px-space-md py-space-sm btn btn-secondary disabled:opacity-40"
             onClick={onClose}
             disabled={submitting}
             type="button"
@@ -141,7 +139,7 @@ export default function EditConnectionForm({ connection, onSave, onDelete, onClo
               {t.flow.delete}
             </button>
             <button
-              className="px-space-sm py-1.5 rounded-xl bg-surface-container-high hover:bg-surface-bright text-on-surface font-headline text-headline-sm transition-colors"
+              className="px-space-sm py-1.5 btn btn-secondary"
               onClick={() => setConfirmingDelete(false)}
               disabled={submitting}
               type="button"

@@ -3,6 +3,7 @@ import { useLanguage } from "../i18n/LanguageContext";
 import { Icon } from "../icons";
 import { NAV_ITEMS } from "./navItems";
 import ProjectSwitcher from "./ProjectSwitcher";
+import SidebarEnvironmentPicker from "./SidebarEnvironmentPicker";
 import type { SidebarState } from "./useSidebarState";
 
 interface SidebarProps {
@@ -19,7 +20,7 @@ export default function Sidebar({ state, onCollapseToggle, onHide }: SidebarProp
 
   return (
     <aside
-      className={`fixed left-0 top-0 h-full bg-surface-container-lowest/90 backdrop-blur-xl z-50 flex flex-col justify-between p-space-md shadow-[0_1px_8px_rgba(0,0,0,0.3)] transition-[width] duration-200 ${
+      className={`fixed left-0 top-0 h-full bg-surface-container-lowest/90 backdrop-blur-xl z-50 flex flex-col justify-between p-space-md shadow-bar transition-[width] duration-200 ${
         expanded ? "w-72" : "w-20"
       }`}
     >
@@ -37,6 +38,8 @@ export default function Sidebar({ state, onCollapseToggle, onHide }: SidebarProp
             </button>
           )}
         </div>
+
+        <SidebarEnvironmentPicker expanded={expanded} />
 
         {!expanded && (
           <button

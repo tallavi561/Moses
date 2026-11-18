@@ -13,6 +13,7 @@ export interface NavItem {
  * `icon` is a Material Symbols Outlined icon name (see icons.tsx).
  */
 export const NAV_ITEMS: NavItem[] = [
+  { path: "chat", labelKey: "chat", icon: "forum", enabled: true },
   { path: "search", labelKey: "search", icon: "terminal", enabled: true },
   { path: "flow", labelKey: "flow", icon: "account_tree", enabled: true },
   { path: "dashboard", labelKey: "dashboard", icon: "monitoring", enabled: false },

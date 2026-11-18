@@ -6,12 +6,15 @@ import {
   fetchApiKeys,
   removeEnvironment,
   revokeApiKey,
+  saveLlm,
+  type LlmInput,
   type ApiKeyInfo,
   type CreatedApiKey,
 } from "../api";
 import { useProjects } from "../projects/ProjectsContext";
 import { useLanguage } from "../i18n/LanguageContext";
 import { Icon } from "../icons";
+import { LlmFields, emptyLlmInput } from "./LlmForm";
 
 /**
  * The current project's environments and, per environment, the API keys its services report in
@@ -30,6 +33,9 @@ export default function EnvironmentSettings() {
   // The one moment a key's value exists on screen: right after it was created.
   const [created, setCreated] = useState<CreatedApiKey | null>(null);
   const [copied, setCopied] = useState(false);
+  // Optional: the new environment gets its own AI model key instead of the project's.
+  const [ownModel, setOwnModel] = useState(false);
+  const [model, setModel] = useState<LlmInput>(() => emptyLlmInput());
 
   useEffect(() => {
     setKeys(null);
@@ -74,6 +80,17 @@ export default function EnvironmentSettings() {
       await addEnvironment(projectId, name);
       setNewName("");
       await reload();
+      if (ownModel) {
+        try {
+          await saveLlm(projectId, model, name);
+          setOwnModel(false);
+          setModel(emptyLlmInput());
+        } catch (e) {
+          // The environment exists; only its key was refused. Say why, keep the form filled.
+          setError(t.environments.createdButKeyFailed.replace("{reason}", e instanceof Error ? e.message : ""));
+          return;
+        }
+      }
     }, t.environments.addFailed);
   }
 
@@ -117,7 +134,7 @@ export default function EnvironmentSettings() {
   const environments = currentProject.environments;
 
   return (
-    <div className="bg-surface-container-low rounded-2xl shadow-sm p-space-lg">
+    <div className="card">
       <h2 className="font-headline text-headline-md text-on-surface">{t.environments.title}</h2>
       <p className="font-body-sm text-body-sm text-on-surface-variant mt-space-xs mb-space-md">
         {t.environments.hint}
@@ -133,7 +150,7 @@ export default function EnvironmentSettings() {
                 {isOwner && (
                   <div className="flex items-center gap-space-sm">
                     <button
-                      className="flex items-center gap-1 px-space-sm py-1 rounded-lg bg-surface-container-high hover:bg-surface-bright text-on-surface font-body-sm text-body-sm transition-colors disabled:opacity-40"
+                      className="flex items-center gap-1 px-space-sm py-1 btn-secondary rounded-lg font-body-sm text-body-sm disabled:opacity-40"
                       onClick={() => handleCreateKey(name)}
                       disabled={busy}
                       type="button"
@@ -168,7 +185,7 @@ export default function EnvironmentSettings() {
                       value={created.key}
                     />
                     <button
-                      className="shrink-0 flex items-center gap-1 px-space-md py-space-sm rounded-xl bg-surface-container-high hover:bg-surface-bright text-on-surface font-headline text-headline-sm transition-colors"
+                      className="shrink-0 flex items-center gap-1 px-space-md py-space-sm btn btn-secondary"
                       onClick={handleCopy}
                       type="button"
                     >
@@ -223,13 +240,18 @@ export default function EnvironmentSettings() {
               title={t.environments.nameRule}
             />
             <button
-              className="shrink-0 px-space-md py-space-sm rounded-xl bg-primary-container hover:bg-inverse-primary text-on-primary-container font-headline text-headline-sm transition-all disabled:opacity-40"
+              className="shrink-0 px-space-md py-space-sm btn btn-primary disabled:opacity-40"
               disabled={!newName.trim() || busy}
               type="submit"
             >
               {t.team.add}
             </button>
           </div>
+          <label className="flex items-center gap-space-xs font-body-sm text-body-sm text-on-surface-variant mt-space-xs">
+            <input type="checkbox" checked={ownModel} onChange={(e) => setOwnModel(e.target.checked)} />
+            {t.environments.ownModelOnCreate}
+          </label>
+          {ownModel && <LlmFields value={model} onChange={setModel} />}
         </form>
       ) : (
         <p className="font-body-sm text-body-sm text-on-surface-variant mt-space-md">{t.environments.ownerOnly}</p>

@@ -11,6 +11,7 @@ import {
   type TraceScale,
   type TraceSpan,
 } from "../traceSpans";
+import { chartColor } from "../chartColors";
 
 interface TraceViewProps {
   traceId: string;
@@ -18,7 +19,6 @@ interface TraceViewProps {
 }
 
 /** Distinct, theme-independent colours so a service keeps its colour on every row. */
-const SERVICE_PALETTE = ["#5b9bd5", "#ffc000", "#00b050", "#ed7d31", "#9e6bd1", "#26c6da", "#ef5b8f", "#a5a5a5"];
 
 const ROW_HEIGHT = 34;
 const LABEL_WIDTH = 170;
@@ -182,7 +182,7 @@ function Timeline({ spans, logScale, scale }: { spans: TraceSpan[]; logScale: bo
       return next;
     });
   const services = useMemo(() => [...new Set(spans.map((s) => s.service))], [spans]);
-  const colorOf = (service: string) => SERVICE_PALETTE[services.indexOf(service) % SERVICE_PALETTE.length];
+  const colorOf = (service: string) => chartColor(services.indexOf(service));
 
   return (
     // The chart is always left-to-right (time flows rightwards) even in the Hebrew UI.
@@ -311,7 +311,7 @@ function LogsList({ logs }: { logs: LogEntry[] }) {
             </span>
             <span
               className="w-2.5 h-2.5 rounded-full shrink-0"
-              style={{ background: SERVICE_PALETTE[services.indexOf(log.serviceName) % SERVICE_PALETTE.length] }}
+              style={{ background: chartColor(services.indexOf(log.serviceName)) }}
             />
             <span className="font-headline text-headline-sm text-on-surface">{log.serviceName}</span>
             <LevelBadge level={log.logLevel} />
@@ -371,7 +371,7 @@ export default function TraceView({ traceId, onClose }: TraceViewProps) {
     }`;
 
   return (
-    <div className="bg-surface-container-low rounded-2xl shadow-sm p-space-lg">
+    <div className="card">
       <div className="flex items-start justify-between gap-space-sm mb-space-sm">
         <div className="min-w-0">
           <h2 className="font-headline text-headline-md text-on-surface">{t.search.traceTitle}</h2>
@@ -379,7 +379,7 @@ export default function TraceView({ traceId, onClose }: TraceViewProps) {
         </div>
         <button
           type="button"
-          className="shrink-0 flex items-center gap-1 px-space-sm py-1 rounded-lg bg-surface-container-high hover:bg-surface-bright text-on-surface font-label-md text-label-md transition-colors"
+          className="shrink-0 flex items-center gap-1 px-space-sm py-1 btn-secondary rounded-lg font-label-md text-label-md"
           onClick={onClose}
         >
           <Icon name="close" size={16} />

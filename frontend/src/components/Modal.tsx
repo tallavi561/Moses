@@ -8,7 +8,7 @@ interface ModalProps {
 export default function Modal({ onClose, children }: ModalProps) {
   return (
     <div
-      className="fixed inset-0 z-[60] bg-black/60 backdrop-blur-sm flex items-center justify-center p-space-md"
+      className="fixed inset-0 z-[60] bg-scrim backdrop-blur-sm flex items-center justify-center p-space-md"
       onClick={onClose}
     >
       <div

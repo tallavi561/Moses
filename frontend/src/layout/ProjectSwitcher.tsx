@@ -75,7 +75,7 @@ export default function ProjectSwitcher({ expanded }: ProjectSwitcherProps) {
       </button>
 
       {open && (
-        <div className="absolute left-0 top-[calc(100%+8px)] w-60 bg-surface-container-low rounded-2xl shadow-2xl p-space-sm z-50 space-y-1">
+        <div className="absolute left-0 top-[calc(100%+8px)] w-60 dropdown-panel">
           <div className="font-label-sm text-label-sm text-on-surface-variant uppercase px-space-sm py-space-xs">
             {t.projects.switchProject}
           </div>

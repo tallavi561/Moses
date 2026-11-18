@@ -4,6 +4,7 @@ import { useLanguage } from "../i18n/LanguageContext";
 import { Icon } from "../icons";
 import { probeStatusLabel } from "../probeStatus";
 import NodeMetrics from "./NodeMetrics";
+import { STATUS_DOT } from "../statusStyles";
 
 interface ArchitectureListViewProps {
   states: ProcessState[];
@@ -11,13 +12,6 @@ interface ArchitectureListViewProps {
   onEditNode: (node: ProcessState) => void;
   onEditConnection: (connection: Connection) => void;
 }
-
-const STATUS_DOT: Record<ProcessState["status"], string> = {
-  UP: "bg-secondary",
-  DEGRADED: "bg-tertiary",
-  DOWN: "bg-primary-container",
-  UNKNOWN: "bg-outline",
-};
 
 export default function ArchitectureListView({ states, connections, onEditNode, onEditConnection }: ArchitectureListViewProps) {
   const { t } = useLanguage();
@@ -80,7 +74,7 @@ export default function ArchitectureListView({ states, connections, onEditNode, 
                         </p>
                       )}
                       <button
-                        className="w-fit flex items-center gap-1.5 px-space-md py-1.5 rounded-xl bg-surface-container-high hover:bg-surface-bright text-on-surface font-headline text-headline-sm transition-colors"
+                        className="w-fit flex items-center gap-1.5 px-space-md py-1.5 btn btn-secondary"
                         onClick={() => onEditNode(node)}
                         type="button"
                       >

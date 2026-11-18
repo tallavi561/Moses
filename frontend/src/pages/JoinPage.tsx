@@ -72,7 +72,7 @@ export default function JoinPage() {
                 </p>
               )}
               <button
-                className="w-full flex items-center justify-center gap-space-sm py-space-sm px-space-md rounded-xl bg-primary-container hover:bg-inverse-primary text-on-primary-container font-headline text-headline-sm transition-all shadow-md disabled:opacity-50"
+                className="w-full flex items-center justify-center gap-space-sm py-space-sm px-space-md btn btn-primary shadow-md disabled:opacity-50"
                 disabled={state === "joining"}
                 onClick={handleJoin}
                 type="button"
