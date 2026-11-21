@@ -15,9 +15,9 @@ import java.util.HexFormat;
  * The key a monitored service sends with its logs and heartbeats. It belongs to exactly one
  * environment of one project, which is how incoming data gets an owner.
  *
- * Only the SHA-256 of the key is stored (as the document id), so the database never holds a
- * usable key: it is shown once, when created. A plain hash is enough here - unlike a password,
- * the key is 256 random bits, so there is nothing to brute-force.
+ * The key is looked up by its SHA-256 (the document id) - a plain hash is enough, since the key
+ * is 256 random bits. So the owner can show and copy it again later, it is also kept encrypted
+ * ({@link SecretBox}); keys created before that have only the hash and cannot be shown again.
  */
 @Document(collection = "api_keys")
 public class ApiKey {
@@ -33,6 +33,10 @@ public class ApiKey {
 
     /** The first characters of the key, kept so people can tell their keys apart. */
     private String prefix;
+
+    /** The key itself, encrypted; null for keys created before keys could be shown again. */
+    @Field("key_ciphertext")
+    private String keyCiphertext;
 
     @Field("created_by")
     private String createdBy;
@@ -57,6 +61,8 @@ public class ApiKey {
     public void setEnvironment(String environment) { this.environment = environment; }
     public String getPrefix() { return prefix; }
     public void setPrefix(String prefix) { this.prefix = prefix; }
+    public String getKeyCiphertext() { return keyCiphertext; }
+    public void setKeyCiphertext(String keyCiphertext) { this.keyCiphertext = keyCiphertext; }
     public String getCreatedBy() { return createdBy; }
     public void setCreatedBy(String createdBy) { this.createdBy = createdBy; }
     public Instant getCreatedAt() { return createdAt; }

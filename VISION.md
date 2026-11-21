@@ -137,6 +137,13 @@ Growing it toward the vision means, roughly, in order of how much groundwork eac
 2. **Anomaly detection** - noticing a service is behaving unusually (error rate, latency,
    restart frequency) without a human asking a question first. Needs pillars 3-4
    (tracing/metrics) to be meaningful beyond "it stopped sending heartbeats."
+   **Started (rule-based, no AI):** error spikes per service against its own normal, and
+   services going DOWN, open incidents that are posted to the team chat (ARCHITECTURE.md §5).
+   Past incidents form a library (cause, fix, "seen before" matched by error signature) that
+   new alerts quote. Trace-flow checks: MoSes learns the paths requests take from traces and
+   suggests them, the team approves, and broken flows open incidents. "Investigate with AI" on
+   one incident proposes a root cause and fix from logs, traces, code and the library; the
+   team decides what goes into the library.
 3. **Root-cause correlation** - given an anomaly, automatically pulling the relevant
    logs + trace + topology neighbors + recent metric shift into one explanation, instead
    of a human manually cross-referencing dashboards. This is the point where "all

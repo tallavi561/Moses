@@ -99,6 +99,7 @@ public class AuthInterceptor implements HandlerInterceptor {
                 if (scope.readOnly() && isChange(method, path)) {
                     return reject(response, HttpServletResponse.SC_FORBIDDEN, "viewers cannot make changes");
                 }
+                request.setAttribute(USER_ATTRIBUTE, userId);
             }
         } catch (ScopeResolver.UnavailableException e) {
             return reject(response, HttpServletResponse.SC_SERVICE_UNAVAILABLE, "could not verify access, try again");
@@ -106,6 +107,9 @@ public class AuthInterceptor implements HandlerInterceptor {
         request.setAttribute(SCOPE_ATTRIBUTE, scope);
         return true;
     }
+
+    /** The signed-in user behind a scoped request (absent for API-key requests). */
+    static final String USER_ATTRIBUTE = "moses.userId";
 
     static boolean isPublic(String method, String path) {
         // CORS preflight never carries credentials.
@@ -142,9 +146,13 @@ public class AuthInterceptor implements HandlerInterceptor {
                         || path.equals("/api/process/dashboards"));
     }
 
-    /** Requests that change monitoring data. Asking the AI a question is a POST but only reads. */
+    /**
+     * Requests that change monitoring data. Asking the AI a question is a POST but only reads;
+     * having it edit a dashboard or investigate an incident (written onto the incident) is a change.
+     */
     static boolean isChange(String method, String path) {
-        return !"GET".equalsIgnoreCase(method) && (under(path, "/api/logs") || under(path, "/api/process"));
+        return !"GET".equalsIgnoreCase(method) && (under(path, "/api/logs") || under(path, "/api/process")
+                || under(path, "/api/ai/dashboards") || under(path, "/api/ai/incidents"));
     }
 
     private static boolean under(String path, String prefix) {

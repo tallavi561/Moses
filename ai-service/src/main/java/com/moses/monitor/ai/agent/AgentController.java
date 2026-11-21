@@ -11,13 +11,8 @@ import org.springframework.web.bind.annotation.RequestHeader;
 import org.springframework.web.bind.annotation.RestController;
 import org.springframework.web.server.ResponseStatusException;
 
-import java.time.LocalDate;
-import java.time.ZoneOffset;
 import java.util.ArrayList;
 import java.util.List;
-import java.util.Map;
-import java.util.concurrent.ConcurrentHashMap;
-import java.util.concurrent.atomic.AtomicInteger;
 
 /**
  * The chat agent: answers one chat message, reading the project's repository and monitoring
@@ -42,20 +37,18 @@ public class AgentController {
     private final LlmClient llm;
     private final AgentTools tools;
     private final int maxSteps;
-    private final int dailyLimit;
-    private final Map<String, AtomicInteger> usedToday = new ConcurrentHashMap<>();
+    private final AgentQuota quota;
     private final byte[] internalToken;
 
-    public AgentController(LlmClient llm, AgentTools tools,
+    public AgentController(LlmClient llm, AgentTools tools, AgentQuota quota,
                            @Value("${moses.agent.max-steps:15}") int maxSteps,
-                           @Value("${moses.agent.daily-replies-per-project:200}") int dailyLimit,
                            @Value("${moses.internal.token:}") String internalToken) {
         this.internalToken = internalToken == null || internalToken.isBlank() ? null
                 : internalToken.getBytes(java.nio.charset.StandardCharsets.UTF_8);
         this.llm = llm;
         this.tools = tools;
         this.maxSteps = maxSteps;
-        this.dailyLimit = dailyLimit;
+        this.quota = quota;
     }
 
     @PostMapping("/internal/agent/reply")
@@ -74,7 +67,7 @@ public class AgentController {
         if (request.question() == null || request.question().isBlank()) {
             throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "empty question");
         }
-        countAgainstDailyLimit(projectId);
+        quota.count(projectId);
 
         String repoUrl = RepoReader.isAcceptedUrl(request.repoUrl()) ? request.repoUrl().trim() : null;
         MonitoringReader.Scope scope = new MonitoringReader.Scope(projectId, environment);
@@ -93,19 +86,6 @@ public class AgentController {
                 projectId, result.steps(), result.stopReason(), result.inputTokens(), result.outputTokens(),
                 System.currentTimeMillis() - started);
         return new AgentReply(result.text(), result.steps());
-    }
-
-    /** A per-project cap on answers per UTC day, so a loop or a chatty day can't run up the bill. */
-    private void countAgainstDailyLimit(String projectId) {
-        String key = projectId + "|" + LocalDate.now(ZoneOffset.UTC);
-        if (usedToday.size() > 10_000) {
-            usedToday.keySet().removeIf(k -> !k.endsWith(LocalDate.now(ZoneOffset.UTC).toString()));
-        }
-        int used = usedToday.computeIfAbsent(key, k -> new AtomicInteger()).incrementAndGet();
-        if (used > dailyLimit) {
-            throw new ResponseStatusException(HttpStatus.TOO_MANY_REQUESTS,
-                    "I've reached today's limit of " + dailyLimit + " answers for this project. It resets at midnight UTC.");
-        }
     }
 
     static List<TranscriptLine> safe(List<TranscriptLine> lines) {

@@ -1,17 +1,128 @@
 import { useEffect, useState } from "react";
 import {
+  ApiError,
   createDashboard,
   deleteDashboard,
+  editDashboardWithAi,
   fetchDashboards,
   fetchProcessState,
+  updateDashboard,
   type DashboardScope,
   type DashboardView,
+  type DashboardVisibility,
   type ProcessState,
 } from "../api";
 import { useLanguage } from "../i18n/LanguageContext";
 import { Icon } from "../icons";
 import { STATUS_BADGE, STATUS_DOT } from "../statusStyles";
 import MetricsChart from "../components/MetricsChart";
+import { useProjects } from "../projects/ProjectsContext";
+
+/**
+ * "Describe the change": the project's AI model turns free text into chart settings and saves
+ * them. Shows what it did, or what it couldn't do.
+ */
+function AiEditBox({
+  dashboard,
+  onEdited,
+  onClose,
+}: {
+  dashboard: DashboardView;
+  onEdited: (d: DashboardView) => void;
+  onClose: () => void;
+}) {
+  const { t } = useLanguage();
+  const [instruction, setInstruction] = useState("");
+  const [working, setWorking] = useState(false);
+  const [result, setResult] = useState<{ summary: string | null; note: string | null; changed: boolean } | null>(null);
+  const [error, setError] = useState<string | null>(null);
+
+  async function submit() {
+    const text = instruction.trim();
+    if (!text || working) return;
+    setWorking(true);
+    setError(null);
+    setResult(null);
+    try {
+      const r = await editDashboardWithAi(dashboard.id, text);
+      if (r.changed) onEdited(r.dashboard);
+      setResult({ summary: r.summary, note: r.note, changed: r.changed });
+      if (r.changed) setInstruction("");
+    } catch (e) {
+      setError(e instanceof ApiError && e.status === 409 ? t.dashboard.aiNoModel : (e as Error).message);
+    } finally {
+      setWorking(false);
+    }
+  }
+
+  return (
+    <div className="flex flex-col gap-space-xs bg-surface-container rounded-xl p-space-sm">
+      <div className="flex items-center gap-space-xs">
+        <Icon name="auto_awesome" size={18} className="shrink-0 text-secondary" />
+        <input
+          type="text"
+          autoFocus
+          value={instruction}
+          onChange={(e) => setInstruction(e.target.value)}
+          onKeyDown={(e) => {
+            if (e.key === "Enter") submit();
+            if (e.key === "Escape") onClose();
+          }}
+          placeholder={t.dashboard.aiPlaceholder}
+          className="field flex-1 min-w-0"
+          maxLength={1000}
+          disabled={working}
+          aria-label={t.dashboard.aiEdit}
+        />
+        <button
+          type="button"
+          className="shrink-0 flex items-center gap-1.5 px-space-md py-space-sm btn btn-primary disabled:opacity-40"
+          onClick={submit}
+          disabled={working || !instruction.trim()}
+        >
+          {working ? (
+            <Icon name="progress_activity" size={18} className="animate-spin" />
+          ) : (
+            <Icon name="send" size={18} />
+          )}
+          {t.dashboard.aiApply}
+        </button>
+        <button
+          type="button"
+          className="shrink-0 p-1.5 rounded-lg text-on-surface-variant hover:bg-surface-container-high hover:text-on-surface transition-colors"
+          onClick={onClose}
+          aria-label={t.dashboard.cancelCreate}
+          title={t.dashboard.cancelCreate}
+        >
+          <Icon name="close" size={18} />
+        </button>
+      </div>
+      {!result && !error && (
+        <p className="font-body-sm text-body-sm text-on-surface-variant">{t.dashboard.aiHint}</p>
+      )}
+      {result && (
+        <div className="flex flex-col gap-0.5 font-body-sm text-body-sm">
+          <p className="flex items-center gap-1 text-on-surface">
+            <Icon name={result.changed ? "check_circle" : "info"} size={15} className={result.changed ? "text-secondary" : ""} />
+            {result.summary ?? (result.changed ? t.dashboard.aiDone : t.dashboard.aiNoChange)}
+          </p>
+          {result.note && (
+            <p className="flex items-center gap-1 text-on-surface-variant">
+              <Icon name="warning" size={15} />
+              {result.note}
+            </p>
+          )}
+        </div>
+      )}
+      {error && (
+        <p className="flex items-center gap-1 font-body-sm text-body-sm text-error">
+          <Icon name="error" size={15} />
+          {error}
+        </p>
+      )}
+    </div>
+  );
+}
 
 function NewDashboardForm({
   services,
@@ -26,6 +137,7 @@ function NewDashboardForm({
   const [scope, setScope] = useState<DashboardScope>("ENVIRONMENT");
   const [serviceName, setServiceName] = useState(services[0] ?? "");
   const [title, setTitle] = useState("");
+  const [visibility, setVisibility] = useState<DashboardVisibility>("SHARED");
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
@@ -38,6 +150,7 @@ function NewDashboardForm({
         scope,
         serviceName: scope === "SERVICE" ? serviceName : undefined,
         title: title.trim() || undefined,
+        visibility,
       });
       onCreated(created);
     } catch (e) {
@@ -82,6 +195,28 @@ function NewDashboardForm({
         </select>
       )}
 
+      <div className="flex items-center gap-space-sm flex-wrap">
+        <div className="flex items-center bg-surface-container-high rounded-lg p-0.5 w-fit" role="radiogroup" aria-label={t.dashboard.visibilityLabel}>
+          {(["SHARED", "PRIVATE"] as const).map((v) => (
+            <button
+              key={v}
+              type="button"
+              className={`flex items-center gap-1 px-space-sm py-1 rounded-md font-code text-code-sm transition-all ${
+                visibility === v ? "bg-surface text-secondary" : "text-on-surface-variant hover:text-on-surface"
+              }`}
+              aria-pressed={visibility === v}
+              onClick={() => setVisibility(v)}
+            >
+              <Icon name={v === "SHARED" ? "group" : "lock"} size={14} />
+              {v === "SHARED" ? t.dashboard.visibilityShared : t.dashboard.visibilityPrivate}
+            </button>
+          ))}
+        </div>
+        <span className="font-body-sm text-body-sm text-on-surface-variant">
+          {visibility === "SHARED" ? t.dashboard.visibilitySharedHint : t.dashboard.visibilityPrivateHint}
+        </span>
+      </div>
+
       <input
         type="text"
         value={title}
@@ -120,15 +255,55 @@ function DashboardCard({
   allServices,
   state,
   onDelete,
+  onChange,
 }: {
   dashboard: DashboardView;
   allServices: string[];
   state: ProcessState | undefined;
   onDelete: (id: string) => void;
+  onChange: (d: DashboardView) => void;
 }) {
   const { t } = useLanguage();
+  const { canEdit } = useProjects();
   const [confirming, setConfirming] = useState(false);
-  const initialSelected = dashboard.scope === "SERVICE" && dashboard.serviceName ? [dashboard.serviceName] : allServices;
+  const [aiOpen, setAiOpen] = useState(false);
+  // Bumped when the AI changes the settings, so the chart starts over from the saved ones.
+  const [chartVersion, setChartVersion] = useState(0);
+  const [saveError, setSaveError] = useState<string | null>(null);
+  const initialSelected = dashboard.services.length ? dashboard.services : allServices;
+
+  async function toggleVisibility() {
+    try {
+      const saved = await updateDashboard(dashboard.id, {
+        visibility: dashboard.visibility === "PRIVATE" ? "SHARED" : "PRIVATE",
+      });
+      setSaveError(null);
+      onChange(saved);
+    } catch (e) {
+      setSaveError((e as Error).message);
+    }
+  }
+
+  function handleAiEdited(d: DashboardView) {
+    onChange(d);
+    setChartVersion((v) => v + 1);
+  }
+
+  async function saveChartSettings(s: { selected: string[]; metric: DashboardView["metric"]; minutesBack: number }) {
+    if (!canEdit) return;
+    const everything = allServices.length > 0 && allServices.every((name) => s.selected.includes(name));
+    try {
+      const saved = await updateDashboard(dashboard.id, {
+        services: everything ? [] : s.selected,
+        metric: s.metric,
+        minutesBack: s.minutesBack,
+      });
+      setSaveError(null);
+      onChange(saved);
+    } catch (e) {
+      setSaveError((e as Error).message);
+    }
+  }
 
   return (
     <div className="card flex flex-col gap-space-sm">
@@ -141,6 +316,15 @@ function DashboardCard({
           <span className="shrink-0 font-code text-code-sm text-on-surface-variant bg-surface-container px-space-sm py-0.5 rounded-full">
             {dashboard.scope === "SERVICE" ? t.dashboard.scopeService : t.dashboard.scopeEnvironment}
           </span>
+          {dashboard.visibility === "PRIVATE" && (
+            <span
+              className="shrink-0 flex items-center gap-1 font-code text-code-sm text-on-surface-variant bg-surface-container px-space-sm py-0.5 rounded-full"
+              title={t.dashboard.visibilityPrivateHint}
+            >
+              <Icon name="lock" size={13} />
+              {t.dashboard.visibilityPrivate}
+            </span>
+          )}
           {dashboard.createdBy === "agent" && (
             <span
               className="shrink-0 flex items-center gap-1 font-code text-code-sm text-secondary bg-secondary-container/20 px-space-sm py-0.5 rounded-full"
@@ -175,18 +359,64 @@ function DashboardCard({
             </button>
           </div>
         ) : (
-          <button
-            type="button"
-            className="shrink-0 p-1.5 rounded-lg text-on-surface-variant hover:bg-surface-container-high hover:text-error transition-colors"
-            onClick={() => setConfirming(true)}
-            aria-label={t.dashboard.delete}
-          >
-            <Icon name="delete" size={18} />
-          </button>
+          canEdit && (
+            <div className="shrink-0 flex items-center gap-0.5">
+              {dashboard.mine && (
+                <button
+                  type="button"
+                  className="p-1.5 rounded-lg text-on-surface-variant hover:bg-surface-container-high hover:text-on-surface transition-colors"
+                  onClick={toggleVisibility}
+                  aria-label={dashboard.visibility === "PRIVATE" ? t.dashboard.makeShared : t.dashboard.makePrivate}
+                  title={dashboard.visibility === "PRIVATE" ? t.dashboard.makeShared : t.dashboard.makePrivate}
+                >
+                  <Icon name={dashboard.visibility === "PRIVATE" ? "lock" : "lock_open"} size={18} />
+                </button>
+              )}
+              <button
+                type="button"
+                className={`p-1.5 rounded-lg transition-colors ${
+                  aiOpen
+                    ? "bg-secondary-container/20 text-secondary"
+                    : "text-on-surface-variant hover:bg-surface-container-high hover:text-secondary"
+                }`}
+                onClick={() => setAiOpen((o) => !o)}
+                aria-label={t.dashboard.aiEdit}
+                aria-pressed={aiOpen}
+                title={t.dashboard.aiEdit}
+              >
+                <Icon name="auto_awesome" size={18} />
+              </button>
+              <button
+                type="button"
+                className="p-1.5 rounded-lg text-on-surface-variant hover:bg-surface-container-high hover:text-error transition-colors"
+                onClick={() => setConfirming(true)}
+                aria-label={t.dashboard.delete}
+                title={t.dashboard.delete}
+              >
+                <Icon name="delete" size={18} />
+              </button>
+            </div>
+          )
         )}
       </div>
 
-      <MetricsChart availableServices={allServices} initialSelected={initialSelected} />
+      {aiOpen && <AiEditBox dashboard={dashboard} onEdited={handleAiEdited} onClose={() => setAiOpen(false)} />}
+
+      {saveError && (
+        <p className="flex items-center gap-1 font-body-sm text-body-sm text-error">
+          <Icon name="error" size={15} />
+          {t.dashboard.saveFailed}: {saveError}
+        </p>
+      )}
+
+      <MetricsChart
+        key={chartVersion}
+        availableServices={allServices}
+        initialSelected={initialSelected}
+        initialMetric={dashboard.metric}
+        initialMinutesBack={dashboard.minutesBack}
+        onSettingsChange={saveChartSettings}
+      />
     </div>
   );
 }
@@ -212,6 +442,10 @@ export default function DashboardPage() {
   function handleCreated(d: DashboardView) {
     setDashboards((prev) => (prev ? [...prev.filter((x) => x.id !== d.id), d] : [d]));
     setCreating(false);
+  }
+
+  function handleChanged(d: DashboardView) {
+    setDashboards((prev) => (prev ? prev.map((x) => (x.id === d.id ? d : x)) : prev));
   }
 
   async function handleDelete(id: string) {
@@ -272,6 +506,7 @@ export default function DashboardPage() {
             allServices={allServices}
             state={d.scope === "SERVICE" ? states.find((s) => s.serviceName === d.serviceName) : undefined}
             onDelete={handleDelete}
+            onChange={handleChanged}
           />
         ))
       )}

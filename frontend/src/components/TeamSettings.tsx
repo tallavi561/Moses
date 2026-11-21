@@ -228,12 +228,13 @@ export default function TeamSettings() {
                   value={inviteLink}
                 />
                 <button
-                  className="shrink-0 flex items-center gap-1 px-space-md py-space-sm btn btn-secondary"
+                  className="shrink-0 w-8 h-8 flex items-center justify-center rounded-lg text-on-surface-variant hover:text-on-surface hover:bg-surface-container-high transition-colors"
                   onClick={handleCopy}
+                  title={copied ? t.team.copied : t.team.copy}
+                  aria-label={copied ? t.team.copied : t.team.copy}
                   type="button"
                 >
-                  <Icon name={copied ? "check" : "content_copy"} size={16} />
-                  {copied ? t.team.copied : t.team.copy}
+                  <Icon name={copied ? "check" : "content_copy"} size={18} className={copied ? "text-secondary" : ""} />
                 </button>
               </div>
             )}

@@ -17,6 +17,8 @@ export const NAV_ITEMS: NavItem[] = [
   { path: "search", labelKey: "search", icon: "terminal", enabled: true },
   { path: "flow", labelKey: "flow", icon: "account_tree", enabled: true },
   { path: "dashboard", labelKey: "dashboard", icon: "monitoring", enabled: true },
+  { path: "incidents", labelKey: "incidents", icon: "e911_emergency", enabled: true },
+  { path: "coverage", labelKey: "coverage", icon: "verified_user", enabled: true },
   { path: "uploads", labelKey: "uploads", icon: "multiline_chart", enabled: false },
   { path: "settings", labelKey: "settings", icon: "tune", enabled: true },
 ];

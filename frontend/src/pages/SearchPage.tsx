@@ -1,4 +1,5 @@
 import { useEffect, useState } from "react";
+import { useSearchParams } from "react-router-dom";
 import { askAi, fetchProcessState, type AiInterpretation, type LogEntry } from "../api";
 import { useLanguage, pluralize } from "../i18n/LanguageContext";
 import { Icon } from "../icons";
@@ -325,6 +326,21 @@ export default function SearchPage() {
 
   const feed = useServerLogs(FEED_QUERY);
   const search = useServerLogs(structuredQuery);
+
+  // Deep links from other pages (e.g. an incident): ?trace=<id> opens that trace,
+  // ?service=<name> runs a search for that service's logs.
+  const [searchParams] = useSearchParams();
+  useEffect(() => {
+    const trace = searchParams.get("trace");
+    const service = searchParams.get("service");
+    if (trace) {
+      setTraceId(trace);
+    } else if (service) {
+      setServiceFilter([service]);
+      setLastMode("structured");
+      setStructuredQuery({ words: [], services: [service], nonce: Date.now() });
+    }
+  }, [searchParams]);
 
   useEffect(() => {
     fetchProcessState()

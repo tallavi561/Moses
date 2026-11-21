@@ -19,11 +19,11 @@ import java.util.Map;
 import java.util.concurrent.ConcurrentHashMap;
 
 /**
- * Names of the services in the asker's project, read over REST from process-monitor (ai-service
+ * Names of the services in the asker's project environment, read over REST from process-monitor (ai-service
  * never touches Mongo). The LLM needs them so "the order service" can become the exact
  * `order-service`. The project comes from the request being served (the scope headers
  * api-gateway sets), so one project's service names never reach another's prompt.
- * Cached briefly per project; on failure the last known list (possibly empty) is returned.
+ * Cached briefly per environment; on failure the last known list (possibly empty) is returned.
  */
 @Component
 public class ServiceCatalog {
@@ -64,8 +64,9 @@ public class ServiceCatalog {
             return List.of();
         }
 
-        // Service names are per project, but process-monitor's endpoint also wants an environment.
-        Cached hit = cache.get(projectId);
+        // Services belong to one environment of a project, so that's the cache key.
+        String key = projectId + "|" + environment;
+        Cached hit = cache.get(key);
         if (hit != null && System.nanoTime() - hit.fetchedAtNanos() < TTL.toNanos()) {
             return hit.names();
         }
@@ -89,7 +90,7 @@ public class ServiceCatalog {
             if (cache.size() >= MAX_CACHED_SCOPES) {
                 cache.clear();
             }
-            cache.put(projectId, new Cached(List.copyOf(names), System.nanoTime()));
+            cache.put(key, new Cached(List.copyOf(names), System.nanoTime()));
             return names;
         } catch (Exception e) {
             log.warn("Could not load service names from process-monitor: {}", e.getClass().getSimpleName());

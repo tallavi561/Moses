@@ -17,7 +17,18 @@ import java.time.Instant;
         def = "{'project_id': 1, 'environment': 1, 'channel': 1, 'created_at': -1}")
 public class ChatMessage {
 
-    public enum AuthorType { USER, AGENT }
+    /** SYSTEM: posted by MoSes itself (an incident opened or closed), not by a person or the AI agent. */
+    public enum AuthorType { USER, AGENT, SYSTEM }
+
+    /**
+     * What a SYSTEM message is about, so the client can show it in the reader's language and link
+     * to it. {@code text} still holds a plain-English version.
+     */
+    public record SystemEvent(String type, String incidentId, String serviceName, String incidentKind,
+                              Long errors, Long baseline, Integer windowMinutes, String topError,
+                              Long durationSeconds, Long seenBefore, String lastFix,
+                              String lastFixIncidentId, String flowEntry, Integer checkedTraces,
+                              Integer brokenTraces, String stoppedAt, Integer flowMaxSeconds) { }
 
     /** Enough of the message being answered to show it above the reply without another lookup. */
     public record ReplyPreview(String id, String authorName, AuthorType authorType, String text) { }
@@ -41,6 +52,8 @@ public class ChatMessage {
     private boolean failed;
     @Field("created_at")
     private Instant createdAt;
+    /** Only on SYSTEM messages. */
+    private SystemEvent event;
 
     public String getId() { return id; }
     public void setId(String id) { this.id = id; }
@@ -62,6 +75,8 @@ public class ChatMessage {
     public void setReplyTo(ReplyPreview replyTo) { this.replyTo = replyTo; }
     public boolean isFailed() { return failed; }
     public void setFailed(boolean failed) { this.failed = failed; }
+    public SystemEvent getEvent() { return event; }
+    public void setEvent(SystemEvent event) { this.event = event; }
     public Instant getCreatedAt() { return createdAt; }
     public void setCreatedAt(Instant createdAt) { this.createdAt = createdAt; }
 }

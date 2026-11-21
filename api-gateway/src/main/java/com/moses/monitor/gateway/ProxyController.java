@@ -65,6 +65,9 @@ public class ProxyController {
             headers.set("X-Moses-Project-Id", scope.projectId());
             headers.set("X-Moses-Environment", scope.environment());
         }
+        if (request.getAttribute(AuthInterceptor.USER_ATTRIBUTE) instanceof String userId) {
+            headers.set("X-Moses-User-Id", userId);
+        }
 
         HttpMethod method = HttpMethod.valueOf(request.getMethod());
         org.springframework.http.HttpEntity<byte[]> entity = new org.springframework.http.HttpEntity<>(body, headers);

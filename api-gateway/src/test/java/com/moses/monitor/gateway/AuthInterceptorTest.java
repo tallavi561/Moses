@@ -50,6 +50,8 @@ class AuthInterceptorTest {
         assertTrue(AuthInterceptor.isChange("PUT", "/api/process/nodes/x"));
         assertTrue(AuthInterceptor.isChange("DELETE", "/api/process/connections/1"));
         assertTrue(AuthInterceptor.isChange("POST", "/api/logs"));
+        assertTrue(AuthInterceptor.isChange("POST", "/api/ai/dashboards/d1/edit"));
+        assertFalse(AuthInterceptor.isChange("POST", "/api/ai/query"));
         assertFalse(AuthInterceptor.isChange("GET", "/api/process/state"));
         assertFalse(AuthInterceptor.isChange("GET", "/api/search/page"));
         assertFalse(AuthInterceptor.isChange("POST", "/api/ai/query"));

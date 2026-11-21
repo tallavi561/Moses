@@ -59,7 +59,7 @@ public class RepoReader {
                 : Path.of(cacheDir);
     }
 
-    static boolean isAcceptedUrl(String url) {
+    public static boolean isAcceptedUrl(String url) {
         return url != null && GITHUB_REPO.matcher(url.trim()).matches();
     }
 

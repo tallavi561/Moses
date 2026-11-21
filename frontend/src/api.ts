@@ -423,14 +423,42 @@ export interface DashboardView {
   scope: DashboardScope;
   serviceName: string | null;
   title: string;
+  /** Services the chart shows; empty = every service in the environment. */
+  services: string[];
+  metric: DashboardMetric;
+  minutesBack: number;
+  /** PRIVATE: only its creator sees it. */
+  visibility: DashboardVisibility;
+  /** The signed-in user created it (only they can change its visibility). */
+  mine: boolean;
   createdBy: string | null;
   createdAt: string;
+}
+
+export type DashboardMetric = "cpu" | "memory" | "errors";
+export type DashboardVisibility = "SHARED" | "PRIVATE";
+
+export interface DashboardUpdate {
+  title?: string;
+  services?: string[];
+  metric?: DashboardMetric;
+  minutesBack?: number;
+  visibility?: DashboardVisibility;
+}
+
+/** What the AI did with a free-text edit: the saved dashboard, and a line or two for the user. */
+export interface DashboardAiEdit {
+  dashboard: DashboardView;
+  changed: boolean;
+  summary: string | null;
+  note: string | null;
 }
 
 export interface DashboardPayload {
   scope: DashboardScope;
   serviceName?: string;
   title?: string;
+  visibility?: DashboardVisibility;
 }
 
 export async function fetchDashboards(): Promise<DashboardView[]> {
@@ -456,10 +484,230 @@ export async function deleteDashboard(id: string): Promise<void> {
   if (!res.ok) throw new Error(`Failed to delete dashboard: ${res.status}`);
 }
 
+export async function updateDashboard(id: string, update: DashboardUpdate): Promise<DashboardView> {
+  const res = await apiFetch(`${API_BASE_URL}/api/process/dashboards/${encodeURIComponent(id)}`, {
+    method: "PATCH",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(update),
+  });
+  if (!res.ok) throw new Error(`Failed to save dashboard: ${res.status}`);
+  return res.json();
+}
+
+/** Edits a dashboard from a free-text instruction, using the project's AI model. */
+export async function editDashboardWithAi(id: string, instruction: string): Promise<DashboardAiEdit> {
+  const res = await apiFetch(`${API_BASE_URL}/api/ai/dashboards/${encodeURIComponent(id)}/edit`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ instruction }),
+  });
+  if (!res.ok) {
+    let message = `AI edit failed: ${res.status}`;
+    try {
+      const body = await res.json();
+      if (body?.message) message = body.message;
+    } catch {
+      // not JSON
+    }
+    throw new ApiError(message, res.status);
+  }
+  return res.json();
+}
+
+/** Logs one service sent recently (Monitoring access page). */
+export interface ServiceLogCoverage {
+  serviceName: string;
+  logCount: number;
+  withTraceId: number;
+  lastLogAt: string | null;
+}
+
+export async function fetchLogCoverage(hours = 24): Promise<{ hours: number; services: ServiceLogCoverage[] }> {
+  const res = await apiFetch(`${API_BASE_URL}/api/search/coverage?hours=${hours}`);
+  if (!res.ok) throw new Error(`Failed to load log coverage: ${res.status}`);
+  return res.json();
+}
+
 export interface MetricPoint {
   timestamp: string;
   cpuPercent: number | null;
   memoryMb: number | null;
+  /** Only on error-rate points (fetchErrorRates): ERROR/FATAL logs per minute in the bucket. */
+  errorsPerMinute?: number | null;
+}
+
+/** ERROR/FATAL logs per minute for every service, one point per bucket (zeros included). */
+export async function fetchErrorRates(minutesBack?: number): Promise<ServiceMetrics[]> {
+  const params = new URLSearchParams();
+  if (minutesBack) params.append("minutesBack", String(minutesBack));
+  const res = await apiFetch(`${API_BASE_URL}/api/process/metrics/errors?${params.toString()}`);
+  if (!res.ok) throw new Error(`Failed to load error rates: ${res.status}`);
+  return res.json();
+}
+
+// ---- incidents ----
+
+export type IncidentKind = "ERROR_SPIKE" | "SERVICE_DOWN" | "FLOW_BROKEN";
+export type IncidentState = "OPEN" | "CLOSED";
+
+export interface IncidentErrorGroup {
+  message: string;
+  count: number;
+  lastAt: string | null;
+  traceId: string | null;
+}
+
+/** What the team concluded about an incident (the library part). */
+export type IncidentReview = "UNREVIEWED" | "SOLVED" | "UNSOLVED" | "FALSE_ALARM";
+
+export interface Incident {
+  id: string;
+  environment: string;
+  serviceName: string;
+  kind: IncidentKind;
+  state: IncidentState;
+  openedAt: string;
+  closedAt: string | null;
+  lastBreachAt: string | null;
+  windowMinutes: number;
+  currentErrors: number;
+  peakErrors: number;
+  baselineErrors: number;
+  topErrors: IncidentErrorGroup[];
+  /** FLOW_BROKEN only: serviceName is the flow's target. */
+  flowId?: string | null;
+  flowEntry?: string | null;
+  flowRouteExample?: string | null;
+  flowMaxSeconds?: number | null;
+  checkedTraces: number;
+  brokenTraces: number;
+  peakBrokenTraces: number;
+  brokenExamples: { traceId: string; stoppedAt: string; reason: "NOT_REACHED" | "TOO_SLOW" | "ERROR" }[];
+  /** What the AI proposed when someone asked it to investigate (not the team's review). */
+  aiInvestigation?: AiInvestigation | null;
+  reviewStatus: IncidentReview;
+  rootCause: string | null;
+  resolution: string | null;
+  /** User id of whoever wrote the review last. */
+  reviewedBy: string | null;
+  reviewedAt: string | null;
+}
+
+export interface AiInvestigation {
+  status: "RUNNING" | "DONE" | "FAILED";
+  summary: string | null;
+  rootCause: string | null;
+  suggestedFix: string | null;
+  confidence: "low" | "medium" | "high" | null;
+  evidence: string[] | null;
+  error: string | null;
+  model: string | null;
+  requestedBy: string | null;
+  startedAt: string | null;
+  finishedAt: string | null;
+}
+
+export async function fetchIncident(id: string): Promise<Incident> {
+  const res = await apiFetch(`${API_BASE_URL}/api/process/incidents/${encodeURIComponent(id)}`);
+  if (!res.ok) throw new Error(`Failed to load the incident: ${res.status}`);
+  return res.json();
+}
+
+/** Thrown when the project has no AI model yet (409 "No AI model..."), so the UI can point at Settings. */
+export class NoAiModelError extends Error {}
+
+/** Starts an AI investigation of the incident; it runs in the background (poll fetchIncident). */
+export async function investigateIncident(id: string, language: string): Promise<void> {
+  const res = await apiFetch(`${API_BASE_URL}/api/ai/incidents/${encodeURIComponent(id)}/investigate`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ language }),
+  });
+  if (res.ok) return;
+  const body = await res.json().catch(() => null);
+  const message = body && typeof body.message === "string" ? body.message : `Failed to start the investigation: ${res.status}`;
+  if (res.status === 409 && message.startsWith("No AI model")) throw new NoAiModelError(message);
+  throw new Error(message);
+}
+
+/** Searches past incidents and what the team wrote about them (all environments by default). */
+export async function fetchIncidentLibrary(filter: {
+  q?: string;
+  status?: IncidentReview;
+  allEnvironments?: boolean;
+}): Promise<Incident[]> {
+  const params = new URLSearchParams();
+  if (filter.q?.trim()) params.append("q", filter.q.trim());
+  if (filter.status) params.append("status", filter.status);
+  params.append("allEnvironments", String(filter.allEnvironments ?? true));
+  const res = await apiFetch(`${API_BASE_URL}/api/process/incidents/library?${params.toString()}`);
+  if (!res.ok) throw new Error(`Failed to search incidents: ${res.status}`);
+  return res.json();
+}
+
+/** Earlier incidents like this one: same kind of error, or the same service going down. */
+export async function fetchSimilarIncidents(id: string): Promise<Incident[]> {
+  const res = await apiFetch(`${API_BASE_URL}/api/process/incidents/${encodeURIComponent(id)}/similar`);
+  if (!res.ok) throw new Error(`Failed to load similar incidents: ${res.status}`);
+  return res.json();
+}
+
+export async function reviewIncident(
+  id: string,
+  review: { status?: IncidentReview; rootCause?: string; resolution?: string },
+): Promise<Incident> {
+  const res = await apiFetch(`${API_BASE_URL}/api/process/incidents/${encodeURIComponent(id)}/review`, {
+    method: "PUT",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(review),
+  });
+  if (!res.ok) throw new Error(`Failed to save the review: ${res.status}`);
+  return res.json();
+}
+
+export async function fetchIncidents(state?: IncidentState, limit = 100): Promise<Incident[]> {
+  const params = new URLSearchParams({ limit: String(limit) });
+  if (state) params.append("state", state);
+  const res = await apiFetch(`${API_BASE_URL}/api/process/incidents?${params.toString()}`);
+  if (!res.ok) throw new Error(`Failed to load incidents: ${res.status}`);
+  return res.json();
+}
+
+/** When a service's errors become an incident. `custom` is false while it uses the defaults. */
+export interface AlertRule {
+  serviceName: string;
+  minErrors: number;
+  factor: number;
+  muted: boolean;
+  custom: boolean;
+  /** Minutes of errors counted per check. */
+  windowMinutes: number;
+}
+
+export async function fetchAlertRules(): Promise<AlertRule[]> {
+  const res = await apiFetch(`${API_BASE_URL}/api/process/alert-rules`);
+  if (!res.ok) throw new Error(`Failed to load alert rules: ${res.status}`);
+  return res.json();
+}
+
+export async function saveAlertRule(
+  serviceName: string,
+  update: { minErrors?: number; factor?: number; muted?: boolean },
+): Promise<AlertRule> {
+  const res = await apiFetch(`${API_BASE_URL}/api/process/alert-rules?service=${encodeURIComponent(serviceName)}`, {
+    method: "PUT",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(update),
+  });
+  if (!res.ok) throw new Error(`Failed to save alert rule: ${res.status}`);
+  return res.json();
+}
+
+export async function resetAlertRule(serviceName: string): Promise<void> {
+  const res = await apiFetch(`${API_BASE_URL}/api/process/alert-rules?service=${encodeURIComponent(serviceName)}`, {
+    method: "DELETE",
+  });
+  if (!res.ok) throw new Error(`Failed to reset alert rule: ${res.status}`);
 }
 
 export interface ServiceMetrics {
@@ -511,10 +759,36 @@ export async function askAi(question: string): Promise<AiQueryResponse> {
 /** "team" (everyone in the project) or the signed-in user's private channel with the agent. */
 export type ChatChannel = string;
 
+/** SYSTEM: MoSes itself (incident alerts), not a person or the AI agent. */
+export type ChatAuthorType = "USER" | "AGENT" | "SYSTEM";
+
+/** What a SYSTEM message is about; the chat renders it in the reader's language. */
+export interface ChatSystemEvent {
+  type: "INCIDENT_OPENED" | "INCIDENT_RESOLVED";
+  incidentId: string;
+  serviceName: string;
+  incidentKind: IncidentKind;
+  errors: number | null;
+  baseline: number | null;
+  windowMinutes: number | null;
+  topError: string | null;
+  durationSeconds: number | null;
+  /** INCIDENT_OPENED: how many earlier incidents looked like this one, and the last fix found. */
+  seenBefore?: number | null;
+  lastFix?: string | null;
+  lastFixIncidentId?: string | null;
+  /** FLOW_BROKEN only. serviceName is where requests should have arrived. */
+  flowEntry?: string | null;
+  checkedTraces?: number | null;
+  brokenTraces?: number | null;
+  stoppedAt?: string | null;
+  flowMaxSeconds?: number | null;
+}
+
 export interface ChatReplyPreview {
   id: string;
   authorName: string;
-  authorType: "USER" | "AGENT";
+  authorType: ChatAuthorType;
   text: string;
 }
 
@@ -522,13 +796,15 @@ export interface ChatMessage {
   id: string;
   projectId: string;
   channel: ChatChannel;
-  authorType: "USER" | "AGENT";
+  authorType: ChatAuthorType;
   authorId: string;
   authorName: string;
   text: string;
   replyTo: ChatReplyPreview | null;
   /** The agent could not answer; the text says why. */
   failed: boolean;
+  /** Only on SYSTEM messages. */
+  event?: ChatSystemEvent | null;
   createdAt: string;
 }
 
@@ -627,4 +903,76 @@ export async function saveLlm(projectId: string, input: LlmInput, environment?: 
 /** Owner only. For an environment: back to the project default. */
 export async function clearLlm(projectId: string, environment?: string): Promise<LlmOverview> {
   return llmResult(await apiFetch(llmPath(projectId, environment), { method: "DELETE" }), "Failed to remove the AI model");
+}
+
+// ---- request flows (trace checks) ----
+
+export type TraceFlowStatus = "SUGGESTED" | "ACTIVE" | "PAUSED" | "REJECTED";
+
+/** "Requests entering at entryService (of this route) should reach targetService within maxSeconds." */
+export interface TraceFlow {
+  id: string;
+  entryService: string;
+  /** null = every request entering there. */
+  route: string | null;
+  routeExample: string | null;
+  targetService: string;
+  maxSeconds: number;
+  maxBrokenPercent: number;
+  minTraces: number;
+  status: TraceFlowStatus;
+  createdBy: string | null;
+  learnedSamples: number | null;
+  learnedReachPercent: number | null;
+  learnedP95Seconds: number | null;
+  exampleTraceId: string | null;
+  lastCheckedAt: string | null;
+  lastCheckedTraces: number | null;
+  lastBrokenTraces: number | null;
+}
+
+export async function fetchFlows(): Promise<TraceFlow[]> {
+  const res = await apiFetch(`${API_BASE_URL}/api/process/flows`);
+  if (!res.ok) throw new Error(`Failed to load flows: ${res.status}`);
+  return res.json();
+}
+
+export async function createFlow(flow: {
+  entryService: string;
+  targetService: string;
+  routeExample?: string;
+  maxSeconds?: number;
+}): Promise<TraceFlow> {
+  const res = await apiFetch(`${API_BASE_URL}/api/process/flows`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(flow),
+  });
+  if (!res.ok) throw new Error(`Failed to add the flow: ${res.status}`);
+  return res.json();
+}
+
+export async function updateFlow(
+  id: string,
+  update: { status?: Exclude<TraceFlowStatus, "SUGGESTED">; maxSeconds?: number; maxBrokenPercent?: number },
+): Promise<TraceFlow> {
+  const res = await apiFetch(`${API_BASE_URL}/api/process/flows/${encodeURIComponent(id)}`, {
+    method: "PATCH",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(update),
+  });
+  if (!res.ok) throw new Error(`Failed to update the flow: ${res.status}`);
+  return res.json();
+}
+
+export async function deleteFlow(id: string): Promise<void> {
+  const res = await apiFetch(`${API_BASE_URL}/api/process/flows/${encodeURIComponent(id)}`, { method: "DELETE" });
+  if (!res.ok) throw new Error(`Failed to delete the flow: ${res.status}`);
+}
+
+/** Looks for new suggestions now instead of waiting for the next learning run. */
+export async function learnFlows(): Promise<{ added: number; minSamples: number; flows: TraceFlow[] }> {
+  const res = await apiFetch(`${API_BASE_URL}/api/process/flows/learn`, { method: "POST" });
+  if (!res.ok) throw new Error(`Failed to look for flows: ${res.status}`);
+  return res.json();
 }

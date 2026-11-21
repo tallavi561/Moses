@@ -11,13 +11,15 @@ interface AnimatedLogoProps {
   /** Width and height in px. */
   size?: number;
   className?: string;
+  /** Keep the eagle flying (e.g. while the agent is writing) instead of playing once. */
+  loop?: boolean;
 }
 
 /**
  * The project emblem. The art is black on a transparent background, so it sits on a light tile
  * to stay visible in the dark theme (and looks the same in the light one).
  */
-export default function AnimatedLogo({ size = 40, className = "" }: AnimatedLogoProps) {
+export default function AnimatedLogo({ size = 40, className = "", loop = false }: AnimatedLogoProps) {
   const [play] = useState(() => !hasPlayed);
   const [ready, setReady] = useState(false);
 
@@ -49,7 +51,7 @@ export default function AnimatedLogo({ size = 40, className = "" }: AnimatedLogo
     >
       {ready && (
         <span
-          className={`logo-sprite block ${play ? "logo-sprite--play" : ""}`}
+          className={`logo-sprite block ${loop ? "logo-sprite--loop" : play ? "logo-sprite--play" : ""}`}
           style={{ width: inner, height: inner, backgroundImage: `url(${sprite})` }}
         />
       )}

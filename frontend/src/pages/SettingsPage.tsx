@@ -1,3 +1,4 @@
+import { useState } from "react";
 import { useLanguage } from "../i18n/LanguageContext";
 import { useTheme } from "../theme/ThemeContext";
 import { Icon } from "../icons";
@@ -7,17 +8,24 @@ import AiModelSettings from "../components/AiModelSettings";
 import EnvironmentSettings from "../components/EnvironmentSettings";
 import { API_BASE_URL } from "../api";
 
+const SKILL_PATH = "/moses-monitoring-skill.md";
+
 /**
  * The skill file has a {{MOSES_BASE_URL}} placeholder; fill in this instance's gateway so the
- * downloaded copy points at the right place. Falls back to the plain link if the fetch fails.
+ * downloaded or copied text points at the right place.
  */
+async function loadSkillText(): Promise<string> {
+  const res = await fetch(SKILL_PATH);
+  if (!res.ok) throw new Error(String(res.status));
+  return (await res.text()).split("{{MOSES_BASE_URL}}").join(API_BASE_URL.replace(/\/+$/, ""));
+}
+
+/** Falls back to the plain link if the fetch fails. */
 async function downloadSkill(event: React.MouseEvent<HTMLAnchorElement>) {
   event.preventDefault();
   const href = event.currentTarget.href;
   try {
-    const res = await fetch(href);
-    if (!res.ok) throw new Error(String(res.status));
-    const text = (await res.text()).split("{{MOSES_BASE_URL}}").join(API_BASE_URL.replace(/\/+$/, ""));
+    const text = await loadSkillText();
     const url = URL.createObjectURL(new Blob([text], { type: "text/markdown" }));
     const a = document.createElement("a");
     a.href = url;
@@ -32,6 +40,17 @@ async function downloadSkill(event: React.MouseEvent<HTMLAnchorElement>) {
 export default function SettingsPage() {
   const { t } = useLanguage();
   const { mode, setMode } = useTheme();
+  const [skillCopy, setSkillCopy] = useState<"idle" | "copied" | "failed">("idle");
+
+  async function copySkill() {
+    try {
+      await navigator.clipboard.writeText(await loadSkillText());
+      setSkillCopy("copied");
+    } catch {
+      setSkillCopy("failed");
+    }
+    window.setTimeout(() => setSkillCopy("idle"), 2000);
+  }
 
   return (
     <>
@@ -76,15 +95,30 @@ export default function SettingsPage() {
       <div className="card">
         <h2 className="font-headline text-headline-md text-on-surface">{t.settings.integrationTitle}</h2>
         <p className="font-body-sm text-body-sm text-on-surface-variant mt-space-xs mb-space-md">{t.settings.integrationHint}</p>
-        <a
-          className="inline-flex items-center gap-1.5 px-space-md py-space-sm btn btn-primary shadow-md"
-          href="/moses-monitoring-skill.md"
-          download
-          onClick={downloadSkill}
-        >
-          <Icon name="download" size={18} />
-          {t.settings.downloadSkill}
-        </a>
+        <div className="flex items-center gap-space-sm">
+          <a
+            className="inline-flex items-center gap-1.5 px-space-md py-space-sm btn btn-primary shadow-md"
+            href={SKILL_PATH}
+            download
+            onClick={downloadSkill}
+          >
+            <Icon name="download" size={18} />
+            {t.settings.downloadSkill}
+          </a>
+          <button
+            className="w-10 h-10 flex items-center justify-center rounded-xl btn-secondary"
+            onClick={() => void copySkill()}
+            title={skillCopy === "copied" ? t.team.copied : skillCopy === "failed" ? t.settings.copySkillFailed : t.settings.copySkill}
+            aria-label={t.settings.copySkill}
+            type="button"
+          >
+            <Icon
+              name={skillCopy === "copied" ? "check" : skillCopy === "failed" ? "error" : "content_copy"}
+              size={18}
+              className={skillCopy === "copied" ? "text-secondary" : skillCopy === "failed" ? "text-error" : ""}
+            />
+          </button>
+        </div>
       </div>
     </>
   );

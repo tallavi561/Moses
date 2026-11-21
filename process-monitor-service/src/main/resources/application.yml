@@ -20,3 +20,28 @@ moses:
     check-interval-ms: ${STALE_CHECK_INTERVAL_MS:30000}
   metrics:
     retention-days: ${METRICS_RETENTION_DAYS:3}
+  incidents:
+    # How often to look for error spikes and services that went DOWN, and the window counted.
+    check-interval-ms: ${INCIDENT_CHECK_INTERVAL_MS:60000}
+    initial-delay-ms: ${INCIDENT_INITIAL_DELAY_MS:30000}
+    window-minutes: ${INCIDENT_WINDOW_MINUTES:5}
+    # "Normal" for a service = its average errors per window over this period.
+    baseline-hours: ${INCIDENT_BASELINE_HOURS:24}
+    # A DOWN service opens an incident only if it was alive within this period (not long-dead nodes).
+    down-recently-alive-hours: ${INCIDENT_DOWN_RECENT_HOURS:24}
+  flows:
+    # Learning expected request flows from traces (suggestions only; the team approves).
+    learn-interval-ms: ${FLOW_LEARN_INTERVAL_MS:600000}
+    learn-initial-delay-ms: ${FLOW_LEARN_INITIAL_DELAY_MS:60000}
+    lookback-hours: ${FLOW_LOOKBACK_HOURS:24}
+    # Traces younger than this may still be in progress, so learning skips them.
+    min-trace-age-seconds: ${FLOW_MIN_TRACE_AGE_SECONDS:300}
+    # A path is suggested when at least min-samples traces of an entry point exist and at least
+    # min-reach-percent of them reached the target.
+    min-samples: ${FLOW_MIN_SAMPLES:30}
+    min-reach-percent: ${FLOW_MIN_REACH_PERCENT:90}
+  chat-service:
+    # Incidents are announced in the environment's team chat (POST /internal/chat/system).
+    url: ${CHAT_SERVICE_URL:http://localhost:8087}
+  internal:
+    token: ${INTERNAL_API_TOKEN:}

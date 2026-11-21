@@ -9,6 +9,8 @@ final class Scope {
 
     static final String PROJECT = "X-Moses-Project-Id";
     static final String ENVIRONMENT = "X-Moses-Environment";
+    /** The signed-in user, set by api-gateway; absent when a service calls with its API key. */
+    static final String USER = "X-Moses-User-Id";
 
     private Scope() {
     }

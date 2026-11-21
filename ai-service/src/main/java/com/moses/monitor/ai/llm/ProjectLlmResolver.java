@@ -68,6 +68,11 @@ public class ProjectLlmResolver {
             return hit.client();
         }
         LlmClient client = fetch(projectId, environment);
+        // "No model" is not cached: right after the owner adds one it must work at once.
+        if (!client.isEnabled()) {
+            byScope.remove(key);
+            return client;
+        }
         if (byScope.size() >= MAX_CACHED) {
             byScope.clear();
         }
@@ -79,6 +84,28 @@ public class ProjectLlmResolver {
     public LlmClient forSettings(String provider, String model, String apiKey, String baseUrl) {
         return new LlmConfig().llmClient(provider, model, apiKey == null ? "" : apiKey,
                 baseUrl == null ? "" : baseUrl, timeoutSeconds, agentTimeoutSeconds);
+    }
+
+    /** The project's name and repository URL (either may be null); empty when it can't be read. */
+    public Map<String, String> projectInfo(String projectId) {
+        if (internalToken == null || internalToken.isBlank() || projectId == null) {
+            return Map.of();
+        }
+        try {
+            HttpHeaders headers = new HttpHeaders();
+            headers.set("X-Internal-Token", internalToken);
+            java.net.URI uri = UriComponentsBuilder.fromHttpUrl(authServiceUrl)
+                    .pathSegment("internal", "projects", projectId, "info").build().encode().toUri();
+            Map<?, ?> body = http.exchange(uri, HttpMethod.GET, new HttpEntity<>(headers), Map.class).getBody();
+            Map<String, String> info = new java.util.HashMap<>();
+            if (body != null) {
+                body.forEach((k, v) -> { if (v != null) info.put(String.valueOf(k), String.valueOf(v)); });
+            }
+            return info;
+        } catch (RuntimeException e) {
+            log.warn("could not read project info for {}: {}", projectId, e.toString());
+            return Map.of();
+        }
     }
 
     private LlmClient fetch(String projectId, String environment) {

@@ -49,6 +49,23 @@ public class ScopeIndexInitializer {
                 new Index().on("project_id", Sort.Direction.ASC).on("environment", Sort.Direction.ASC)
                         .named("idx_dashboards_project_environment"));
 
+        mongoTemplate.indexOps(Incident.class).ensureIndex(
+                new Index().on("project_id", Sort.Direction.ASC).on("environment", Sort.Direction.ASC)
+                        .on("opened_at", Sort.Direction.DESC).named("idx_incidents_scope_opened"));
+        mongoTemplate.indexOps(Incident.class).ensureIndex(
+                new Index().on("state", Sort.Direction.ASC).named("idx_incidents_state"));
+        mongoTemplate.indexOps(Incident.class).ensureIndex(
+                new Index().on("project_id", Sort.Direction.ASC).on("signatures", Sort.Direction.ASC)
+                        .named("idx_incidents_project_signatures"));
+        mongoTemplate.indexOps(TraceFlow.class).ensureIndex(
+                new Index().on("project_id", Sort.Direction.ASC).on("environment", Sort.Direction.ASC)
+                        .named("idx_trace_flows_scope"));
+        mongoTemplate.indexOps(TraceFlow.class).ensureIndex(
+                new Index().on("status", Sort.Direction.ASC).named("idx_trace_flows_status"));
+        mongoTemplate.indexOps(AlertRule.class).ensureIndex(
+                new Index().on("project_id", Sort.Direction.ASC).on("environment", Sort.Direction.ASC)
+                        .on("service_name", Sort.Direction.ASC).unique().named("alert_rules_scope_service_unique"));
+
         mongoTemplate.indexOps(MetricSample.class).ensureIndex(
                 new Index().on("project_id", Sort.Direction.ASC).on("environment", Sort.Direction.ASC)
                         .on("service_name", Sort.Direction.ASC).on("timestamp", Sort.Direction.DESC)

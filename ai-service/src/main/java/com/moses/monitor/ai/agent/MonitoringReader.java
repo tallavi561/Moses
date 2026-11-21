@@ -182,6 +182,102 @@ public class MonitoringReader {
         return out.toString();
     }
 
+    // ---- incidents (process-monitor) ----
+
+    /** One incident as process-monitor returns it (null fields included). */
+    public Map<String, Object> incident(Scope scope, String id) {
+        java.net.URI uri = UriComponentsBuilder.fromHttpUrl(processUrl).pathSegment("api", "process", "incidents", id)
+                .build().encode().toUri();
+        @SuppressWarnings("unchecked")
+        Map<String, Object> body = get(scope, uri, Map.class);
+        return body;
+    }
+
+    public List<Map<String, Object>> similarIncidents(Scope scope, String id) {
+        java.net.URI uri = UriComponentsBuilder.fromHttpUrl(processUrl)
+                .pathSegment("api", "process", "incidents", id, "similar").queryParam("limit", 5).build().encode().toUri();
+        @SuppressWarnings("unchecked")
+        List<Map<String, Object>> body = get(scope, uri, List.class);
+        return body == null ? List.of() : body;
+    }
+
+    /** Writes an AI investigation onto the incident, as the user who asked for it. */
+    public void saveInvestigation(Scope scope, String userId, String id, Map<String, Object> investigation) {
+        java.net.URI uri = UriComponentsBuilder.fromHttpUrl(processUrl)
+                .pathSegment("api", "process", "incidents", id, "investigation").build().encode().toUri();
+        HttpHeaders headers = new HttpHeaders();
+        headers.set("X-Moses-Project-Id", scope.projectId());
+        headers.set("X-Moses-Environment", scope.environment());
+        if (userId != null) {
+            headers.set("X-Moses-User-Id", userId);
+        }
+        headers.setContentType(org.springframework.http.MediaType.APPLICATION_JSON);
+        http.exchange(uri, HttpMethod.PUT, new HttpEntity<>(investigation, headers), Map.class);
+    }
+
+    /** The incident library as text for the agent: past incidents, what broke, what the team concluded. */
+    public String searchIncidentLibrary(Scope scope, String query, String status) {
+        UriComponentsBuilder b = UriComponentsBuilder.fromHttpUrl(processUrl + "/api/process/incidents/library")
+                .queryParam("limit", 15);
+        if (query != null && !query.isBlank()) b.queryParam("q", query.trim());
+        if (status != null && !status.isBlank()) b.queryParam("status", status.trim().toUpperCase(java.util.Locale.ROOT));
+        List<?> found = get(scope, b.build().encode().toUri(), List.class);
+        if (found == null || found.isEmpty()) {
+            return "No past incidents match" + (query == null || query.isBlank() ? "." : " \"" + query + "\".");
+        }
+        StringBuilder out = new StringBuilder(found.size() + " incidents, newest first:\n");
+        for (Object o : found) {
+            out.append(describeIncident((Map<?, ?>) o)).append("\n");
+        }
+        return out.toString();
+    }
+
+    /** A compact, model-friendly description of one incident. */
+    public static String describeIncident(Map<?, ?> i) {
+        StringBuilder s = new StringBuilder();
+        s.append("- [").append(i.get("id")).append("] ").append(i.get("kind")).append(" in ").append(i.get("serviceName"))
+                .append(" (env ").append(i.get("environment")).append("), opened ").append(i.get("openedAt"))
+                .append(", ").append(i.get("state"));
+        if (i.get("closedAt") != null) s.append(" at ").append(i.get("closedAt"));
+        if ("ERROR_SPIKE".equals(i.get("kind"))) {
+            s.append("; peak ").append(i.get("peakErrors")).append(" errors per ").append(i.get("windowMinutes"))
+                    .append(" min, normally ~").append(Math.round(((Number) i.get("baselineErrors")).doubleValue()));
+        }
+        if ("FLOW_BROKEN".equals(i.get("kind"))) {
+            s.append("; flow ").append(i.get("flowEntry")).append(" -> ").append(i.get("serviceName"))
+                    .append(" within ").append(i.get("flowMaxSeconds")).append("s, ").append(i.get("brokenTraces"))
+                    .append(" of ").append(i.get("checkedTraces")).append(" requests broke");
+        }
+        if (i.get("topErrors") instanceof List<?> errs && !errs.isEmpty()) {
+            s.append("\n  errors: ");
+            for (Object e : errs) {
+                Map<?, ?> g = (Map<?, ?>) e;
+                s.append("x").append(g.get("count")).append(" \"").append(truncate(String.valueOf(g.get("message")), 200)).append("\"; ");
+            }
+        }
+        if (i.get("brokenExamples") instanceof List<?> br && !br.isEmpty()) {
+            s.append("\n  broken requests: ");
+            for (Object e : br) {
+                Map<?, ?> b = (Map<?, ?>) e;
+                s.append(b.get("reason")).append(" at ").append(b.get("stoppedAt")).append(" (trace ").append(b.get("traceId")).append("); ");
+            }
+        }
+        Object review = i.get("reviewStatus");
+        if (review != null && !"UNREVIEWED".equals(review)) {
+            s.append("\n  team review: ").append(review);
+            if (i.get("rootCause") != null) s.append("; root cause: ").append(truncate(String.valueOf(i.get("rootCause")), 400));
+            if (i.get("resolution") != null) s.append("; fix: ").append(truncate(String.valueOf(i.get("resolution")), 400));
+        }
+        if (i.get("aiInvestigation") instanceof Map<?, ?> ai && "DONE".equals(ai.get("status"))) {
+            s.append("\n  earlier AI investigation (unconfirmed): ").append(truncate(String.valueOf(ai.get("rootCause")), 300));
+        }
+        return s.toString();
+    }
+
+    private static String truncate(String s, int max) {
+        return s == null ? "" : s.length() > max ? s.substring(0, max) + "..." : s;
+    }
+
     private <T> T get(Scope scope, java.net.URI uri, Class<T> type) {
         HttpHeaders headers = new HttpHeaders();
         headers.set("X-Moses-Project-Id", scope.projectId());

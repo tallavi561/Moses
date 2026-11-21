@@ -38,14 +38,20 @@ public class EnvironmentController {
 
     public record ResolveKeyRequest(@NotBlank String key) { }
 
-    /** {@code id} identifies the key for revoking; it is a hash and cannot be used as the key. */
-    public record KeyView(String id, String environment, String prefix, Instant createdAt) {
+    /**
+     * {@code id} identifies the key for revoking; it is a hash and cannot be used as the key.
+     * {@code revealable}: the owner can show it again (false for keys from before that existed).
+     */
+    public record KeyView(String id, String environment, String prefix, Instant createdAt, boolean revealable) {
         static KeyView of(ApiKey key) {
-            return new KeyView(key.getKeyHash(), key.getEnvironment(), key.getPrefix(), key.getCreatedAt());
+            return new KeyView(key.getKeyHash(), key.getEnvironment(), key.getPrefix(), key.getCreatedAt(),
+                    key.getKeyCiphertext() != null);
         }
     }
 
-    /** The only response that ever carries the key itself. */
+    public record RevealedKey(String id, String key) { }
+
+    /** The response to creating a key; {@link RevealedKey} is the other one that carries a key. */
     public record CreatedKeyView(String id, String environment, String prefix, Instant createdAt, String key) { }
 
     /** {@code role} is null when the scope came from an API key instead of a signed-in user. */
@@ -60,11 +66,14 @@ public class EnvironmentController {
     private final MongoTemplate mongoTemplate;
     private final CurrentUser currentUser;
     private final ProjectGuard guard;
+    private final SecretBox secrets;
 
-    public EnvironmentController(MongoTemplate mongoTemplate, CurrentUser currentUser, ProjectGuard guard) {
+    public EnvironmentController(MongoTemplate mongoTemplate, CurrentUser currentUser, ProjectGuard guard,
+                                 SecretBox secrets) {
         this.mongoTemplate = mongoTemplate;
         this.currentUser = currentUser;
         this.guard = guard;
+        this.secrets = secrets;
     }
 
     // ---- environments ----
@@ -139,11 +148,31 @@ public class EnvironmentController {
         apiKey.setProjectId(projectId);
         apiKey.setEnvironment(body.environment());
         apiKey.setPrefix(key.substring(0, VISIBLE_PREFIX_LENGTH));
+        if (secrets.isConfigured()) {
+            apiKey.setKeyCiphertext(secrets.encrypt(key));
+        }
         apiKey.setCreatedBy(user.getId());
         apiKey.setCreatedAt(Instant.now());
         mongoTemplate.insert(apiKey);
         return new CreatedKeyView(apiKey.getKeyHash(), apiKey.getEnvironment(), apiKey.getPrefix(),
                 apiKey.getCreatedAt(), key);
+    }
+
+    /** Owner only: the key itself again, to copy it into a service's configuration. */
+    @GetMapping("/api/projects/{projectId}/keys/{keyId}/reveal")
+    public RevealedKey revealKey(HttpServletRequest request, @PathVariable String projectId,
+                                 @PathVariable String keyId) {
+        guard.requireOwner(projectId, currentUser.require(request));
+        ApiKey apiKey = mongoTemplate.findOne(
+                new Query(Criteria.where("_id").is(keyId).and("project_id").is(projectId)), ApiKey.class);
+        if (apiKey == null) {
+            throw new ResponseStatusException(HttpStatus.NOT_FOUND, "key not found");
+        }
+        if (apiKey.getKeyCiphertext() == null || !secrets.isConfigured()) {
+            throw new ResponseStatusException(HttpStatus.CONFLICT,
+                    "this key was created before keys could be shown again - create a new one");
+        }
+        return new RevealedKey(apiKey.getKeyHash(), secrets.decrypt(apiKey.getKeyCiphertext()));
     }
 
     @DeleteMapping("/api/projects/{projectId}/keys/{keyId}")

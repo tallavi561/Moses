@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { fetchMetrics, type ServiceMetrics } from "../api";
+import { fetchErrorRates, fetchMetrics, type DashboardMetric, type MetricPoint, type ServiceMetrics } from "../api";
 import { useLanguage } from "../i18n/LanguageContext";
 import { Icon } from "../icons";
 import { chartColor } from "../chartColors";
@@ -10,6 +10,10 @@ interface MetricsChartProps {
   availableServices: string[];
   /** Services shown when the chart first mounts. */
   initialSelected: string[];
+  initialMetric?: Metric;
+  initialMinutesBack?: number;
+  /** Called after the user changes a setting by hand (e.g. to save it). */
+  onSettingsChange?: (settings: { selected: string[]; metric: Metric; minutesBack: number }) => void;
 }
 
 const WIDTH = 760;
@@ -28,9 +32,16 @@ const RANGES: { minutes: number; labelKey: "range15m" | "range1h" | "range6h" | 
   { minutes: 10080, labelKey: "range7d" },
 ];
 
-type Metric = "cpu" | "memory";
+type Metric = DashboardMetric;
 
-function valueOf(metric: Metric, point: { cpuPercent: number | null; memoryMb: number | null }): number | null {
+/** Enough decimals that the axis labels stay distinct when the values are small. */
+function formatTick(v: number, max: number): string {
+  const decimals = max >= 20 ? 0 : max >= 2 ? 1 : 2;
+  return v.toFixed(decimals);
+}
+
+function valueOf(metric: Metric, point: MetricPoint): number | null {
+  if (metric === "errors") return point.errorsPerMinute ?? null;
   return metric === "cpu" ? point.cpuPercent : point.memoryMb;
 }
 
@@ -38,24 +49,52 @@ function valueOf(metric: Metric, point: { cpuPercent: number | null; memoryMb: n
  * One Grafana-style chart for however many services are selected: a line per service, a metric
  * toggle (CPU% / memory), a time-range picker, and a hover readout. Polls every 15s.
  */
-export default function MetricsChart({ availableServices, initialSelected }: MetricsChartProps) {
+export default function MetricsChart({
+  availableServices,
+  initialSelected,
+  initialMetric = "cpu",
+  initialMinutesBack = 60,
+  onSettingsChange,
+}: MetricsChartProps) {
   const { t, lang } = useLanguage();
-  const [selected, setSelected] = useState<string[]>(initialSelected);
-  const [metric, setMetric] = useState<Metric>("cpu");
-  const [minutesBack, setMinutesBack] = useState(60);
+  const [selected, setSelectedState] = useState<string[]>(initialSelected);
+  const [metric, setMetricState] = useState<Metric>(initialMetric);
+  const [minutesBack, setMinutesBackState] = useState(initialMinutesBack);
+
+  function setSelected(next: string[]) {
+    setSelectedState(next);
+    onSettingsChange?.({ selected: next, metric, minutesBack });
+  }
+  function setMetric(next: Metric) {
+    setMetricState(next);
+    onSettingsChange?.({ selected, metric: next, minutesBack });
+  }
+  function setMinutesBack(next: number) {
+    setMinutesBackState(next);
+    onSettingsChange?.({ selected, metric, minutesBack: next });
+  }
   const [data, setData] = useState<ServiceMetrics[] | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [hoverFrac, setHoverFrac] = useState<number | null>(null);
   const svgRef = useRef<SVGSVGElement>(null);
 
+  // Every service in the environment is loaded once per range; picking services only filters
+  // what's already here, so it's instant (and the server's cached copy is shared by everyone).
+  // CPU and memory come from the same heartbeat samples; error rates are counted from the logs.
+  const source = metric === "errors" ? "errors" : "samples";
+  const latestRequest = useRef(0);
   const load = useCallback(() => {
-    fetchMetrics(selected.length ? selected : undefined, minutesBack)
+    const request = ++latestRequest.current;
+    (source === "errors" ? fetchErrorRates(minutesBack) : fetchMetrics(undefined, minutesBack))
       .then((d) => {
+        if (request !== latestRequest.current) return; // a newer range was picked meanwhile
         setData(d);
         setError(null);
       })
-      .catch((e) => setError((e as Error).message));
-  }, [selected, minutesBack]);
+      .catch((e) => {
+        if (request === latestRequest.current) setError((e as Error).message);
+      });
+  }, [minutesBack, source]);
 
   useEffect(() => {
     load();
@@ -64,23 +103,27 @@ export default function MetricsChart({ availableServices, initialSelected }: Met
   }, [load]);
 
   const series = useMemo(() => {
-    const shown = data ?? [];
-    return shown.map((s, i) => ({
-      serviceName: s.serviceName,
-      color: chartColor(i),
-      points: s.samples
-        .map((p) => ({ t: Date.parse(p.timestamp), v: valueOf(metric, p) }))
-        .filter((p): p is { t: number; v: number } => p.v !== null && Number.isFinite(p.t)),
-    }));
-  }, [data, metric]);
+    const all = data ?? [];
+    return all
+      // Color by position among all services, so a service keeps its color when others are toggled.
+      .map((s, i) => ({
+        serviceName: s.serviceName,
+        color: chartColor(availableServices.includes(s.serviceName) ? availableServices.indexOf(s.serviceName) : i),
+        points: s.samples
+          .map((p) => ({ t: Date.parse(p.timestamp), v: valueOf(metric, p) }))
+          .filter((p): p is { t: number; v: number } => p.v !== null && Number.isFinite(p.t)),
+      }))
+      .filter((s) => selected.length === 0 || selected.includes(s.serviceName));
+  }, [data, metric, selected, availableServices]);
 
   const nonEmpty = series.filter((s) => s.points.length > 0);
   const allTimes = nonEmpty.flatMap((s) => s.points.map((p) => p.t));
   const allValues = nonEmpty.flatMap((s) => s.points.map((p) => p.v));
   const tMin = allTimes.length ? Math.min(...allTimes) : Date.now() - minutesBack * 60000;
   const tMax = allTimes.length ? Math.max(...allTimes) : Date.now();
-  const vMax = allValues.length ? Math.max(...allValues) : metric === "cpu" ? 100 : 100;
-  const yMax = Math.max(vMax * 1.15, metric === "cpu" ? 10 : 10);
+  // The axis tops out at the highest point plus 10%, so low values still fill the chart.
+  const vMax = allValues.length ? Math.max(...allValues) : 0;
+  const yMax = vMax > 0 ? vMax * 1.1 : 1;
 
   const xOf = (t: number) => PAD_LEFT + ((t - tMin) / Math.max(tMax - tMin, 1)) * (WIDTH - PAD_LEFT - PAD_RIGHT);
   const yOf = (v: number) => HEIGHT - PAD_BOTTOM - (v / yMax) * (HEIGHT - PAD_TOP - PAD_BOTTOM);
@@ -115,7 +158,7 @@ export default function MetricsChart({ availableServices, initialSelected }: Met
           .filter((e) => e.point)
       : [];
 
-  const unit = metric === "cpu" ? "%" : "MB";
+  const unit = metric === "cpu" ? "%" : metric === "memory" ? "MB" : t.dashboard.metricsErrorsUnit;
   const rangeButtonClass = (active: boolean) =>
     `px-space-sm py-0.5 rounded-md font-code text-code-sm transition-all ${
       active ? "bg-surface text-secondary" : "text-on-surface-variant hover:text-on-surface"
@@ -131,6 +174,9 @@ export default function MetricsChart({ availableServices, initialSelected }: Met
             </button>
             <button type="button" className={rangeButtonClass(metric === "memory")} aria-pressed={metric === "memory"} onClick={() => setMetric("memory")}>
               {t.dashboard.metricsMemory}
+            </button>
+            <button type="button" className={rangeButtonClass(metric === "errors")} aria-pressed={metric === "errors"} onClick={() => setMetric("errors")}>
+              {t.dashboard.metricsErrors}
             </button>
           </div>
           <div className="flex items-center bg-surface-container-high rounded-lg p-0.5" role="radiogroup">
@@ -186,7 +232,7 @@ export default function MetricsChart({ availableServices, initialSelected }: Met
                   strokeWidth={1}
                 />
                 <text x={PAD_LEFT - 8} y={yOf(v) + 4} textAnchor="end" className="fill-on-surface-variant" fontSize={11}>
-                  {Math.round(v)}
+                  {formatTick(v, yMax)}
                 </text>
               </g>
             ))}

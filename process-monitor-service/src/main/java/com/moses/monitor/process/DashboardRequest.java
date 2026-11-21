@@ -13,6 +13,17 @@ public class DashboardRequest {
     /** Optional; a sensible default is used when left out. */
     private String title;
 
+    /** Defaults to SHARED. PRIVATE needs a signed-in user (not an API key). */
+    private DashboardVisibility visibility;
+
+    public DashboardVisibility getVisibility() {
+        return visibility;
+    }
+
+    public void setVisibility(DashboardVisibility visibility) {
+        this.visibility = visibility;
+    }
+
     /** Who's asking: "agent" for a monitored service's own integration agent, "user" for the UI. */
     private String createdBy;
 

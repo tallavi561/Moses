@@ -211,8 +211,13 @@ button {
     background-position: 100% 0;
   }
 }
+/* Same frames on repeat, for "the agent is writing". */
+.logo-sprite--loop {
+  animation: logo-play 1.98s steps(9, jump-none) infinite;
+}
 @media (prefers-reduced-motion: reduce) {
-  .logo-sprite--play {
+  .logo-sprite--play,
+  .logo-sprite--loop {
     animation: none;
   }
 }

@@ -116,6 +116,17 @@ public class AgentTools {
                                     "description", "Service names to cover (optional - all services if left out)"),
                             "minutes_back", integer("How far back to look, in minutes (default 60, max 10080 = 7 days)")),
                     null));
+            specs.add(spec("search_incident_library",
+                    "Search past incidents of this project (all environments): what broke, when, and what the team "
+                            + "concluded (root cause, fix). Use it to check whether a problem happened before and how "
+                            + "it was solved.",
+                    props("query", str("Text to look for in service names, error messages, causes and fixes (optional)"),
+                            "status", str("Only incidents the team marked SOLVED, UNSOLVED, FALSE_ALARM or UNREVIEWED (optional)")),
+                    null));
+            specs.add(spec("get_incident",
+                    "One incident by id with its errors, broken requests and review.",
+                    props("incident_id", str("The incident id")),
+                    "incident_id"));
             return specs;
         }
 
@@ -135,6 +146,8 @@ public class AgentTools {
                         i(in, "min_level"), i(in, "minutes_back"), s(in, "trace_id"), i(in, "limit"));
                 case "get_trace" -> monitoring.trace(scope, required(in, "trace_id"));
                 case "get_services" -> monitoring.services(scope);
+                case "search_incident_library" -> monitoring.searchIncidentLibrary(scope, s(in, "query"), s(in, "status"));
+                case "get_incident" -> MonitoringReader.describeIncident(monitoring.incident(scope, required(in, "incident_id")));
                 case "get_metrics" -> monitoring.metricsHistory(scope, words(in.get("services")), i(in, "minutes_back"));
                 default -> throw new IllegalArgumentException("unknown tool " + name);
             };

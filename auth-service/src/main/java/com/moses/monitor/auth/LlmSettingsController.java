@@ -151,6 +151,20 @@ public class LlmSettingsController {
                 chosen.getBaseUrl(), secrets.decrypt(chosen.getKeyCiphertext()));
     }
 
+    /** The project's name and repository, for agent work not started from the chat (incident investigations). */
+    @GetMapping("/internal/projects/{projectId}/info")
+    public java.util.Map<String, String> info(HttpServletRequest request, @PathVariable String projectId) {
+        internal.require(request);
+        Project project = mongoTemplate.findById(projectId, Project.class);
+        if (project == null) {
+            throw new ResponseStatusException(HttpStatus.NOT_FOUND, "project not found");
+        }
+        java.util.Map<String, String> info = new java.util.HashMap<>();
+        info.put("name", project.getName());
+        info.put("repoUrl", project.getRepoUrl());
+        return info;
+    }
+
     // ---- helpers ----
 
     /**

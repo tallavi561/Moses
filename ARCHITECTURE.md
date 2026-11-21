@@ -82,11 +82,11 @@ worth naming so they don't surprise later:
 |---|---|---|
 | `ingestion-service` | Writes to `logs` + `index_buckets`, tokenization, in-memory buffer + flush, TTL retention | **Fully implemented** |
 | `search-service` | Read-only search algorithm (macro-filter → intersection → micro-filter) | **Fully implemented** |
-| `process-monitor-service` | Process/service heartbeats, current topology for the flow diagram | **Skeleton** - heartbeat ingest + state read-back only, no history/alerting yet |
+| `process-monitor-service` | Process/service heartbeats, current topology for the flow diagram | Heartbeats, state, CPU/memory history, dashboards, and incident detection (error spikes, services down) with chat alerts - see §5 |
 | `ai-service` | NL query → structured search-service call; anomaly detection; summarization | **Partly built** - NL→query via a provider-agnostic LLM (rule-based fallback without a key); anomaly-check and summarize endpoints return 501 Not Implemented |
 | `api-gateway` | Single public entry point, reverse proxy, CORS, and the sign-in check on every request (§9) | **Fully implemented** |
 | `auth-service` | User accounts, login tokens, projects with their members and invite links | **Implemented** (email + password; see §9 for what is deliberately not there yet) |
-| `frontend` | React UI: sidebar nav, search, flow diagram, settings | **Shell built per UX spec** (frontend/מסמך אפיון.docx) - collapsible sidebar, EN/HE i18n (English default, layout never mirrors to RTL - only text changes), dark-default theme with manual toggle. Dashboard/Uploads are "coming soon" stubs |
+| `frontend` | React UI: sidebar nav, search, flow diagram, settings | **Shell built per UX spec** (frontend/מסמך אפיון.docx) - collapsible sidebar, EN/HE i18n (English default, layout never mirrors to RTL - only text changes), dark-default theme with manual toggle. Dashboard: saved views per environment (process-monitor `/api/process/dashboards`) with a CPU/memory chart whose services, metric and range are saved; editable by hand or in free text - ai-service `POST /api/ai/dashboards/{id}/edit` has the project's model turn the instruction into those settings (validated, then saved through the same PATCH; viewers can't). A dashboard is shared or private to its creator (api-gateway passes the signed-in user as `X-Moses-User-Id`; someone else's private dashboard is a 404). Incidents page: open incidents, history and per-service alert rules (§5), a Flows tab - request paths MoSes learned from traces and suggests, approved by the team before they are checked - and a Library tab - every incident with the team's review (cause, fix), searchable across environments, and "seen before" per incident; alerts also appear in the team chat, and replying to one with @moses hands it to the agent. The dashboard chart also shows errors per minute. Monitoring access page: what MoSes actually receives per signal and per service (search-service `GET /api/search/coverage` counts recent logs and traced logs per service) and what it can't see yet. Uploads is a "coming soon" stub |
 
 ## 3. The search algorithm (owner-designed, see project_specification.md)
 
@@ -165,8 +165,60 @@ are real gaps worth tracking rather than "discovering" again in six months:
 - `GET /api/process/state` - current snapshot of the nodes of one environment of one
   project (§10), consumed by the React flow view (`reactflow`).
 
-This is intentionally minimal: no history, no alerting, no automatic
-process-discovery agent yet. It proves the pipeline (heartbeat → state → flow
+### Incidents (no AI)
+
+`IncidentDetector` (process-monitor, once a minute) opens and closes `incidents` by
+counting, reading the shared `logs` and `process_state` collections directly:
+- **Error spike** - a service's ERROR/FATAL logs in the last window (5 min) are at least
+  its alert rule's `minErrors` (default 5) AND at least `factor` (default 3) x its normal
+  amount per window (average over the previous 24h). Errors whose messages differ only in
+  ids/numbers are grouped (`ErrorSignature`) for the top-errors list.
+- **Service down** - a service that was alive in the last 24h is now DOWN.
+
+An incident stays open while the condition holds and closes one quiet window after the
+last breach, so a flapping service is one incident. Opening and closing are posted to the
+environment's team chat as SYSTEM messages via chat-service's `POST /internal/chat/system`
+(INTERNAL_API_TOKEN; never routed by the gateway). Per-service rules (`alert_rules`:
+min errors, factor, muted) are edited on the Incidents page (`/api/process/alert-rules`,
+viewers can't). `GET /api/process/metrics/errors` serves ERROR/FATAL logs per minute per
+service for the dashboard chart (same in-memory cache as CPU/memory).
+
+**Incident library.** Each incident also carries what the team concluded: `review_status`
+(UNREVIEWED / SOLVED / UNSOLVED / FALSE_ALARM), `root_cause`, `resolution`, `reviewed_by`
+(`PUT /api/process/incidents/{id}/review`, editors only). Every error signature seen during
+an incident is kept in `signatures`; `IncidentLibrary` finds earlier incidents of the same
+project - any environment, any service - that share one (or the same service going DOWN),
+reviewed ones first (`GET /api/process/incidents/{id}/similar`). A new incident's chat alert
+says "seen N times before" and quotes the last fix found. `GET /api/process/incidents/library`
+searches service names, error messages, causes and fixes (literal, case-insensitive).
+
+**Request flows (trace checks).** A `trace_flows` entry says "a trace entering at service X
+(optionally only those whose first log has signature R) must reach service Y within N
+seconds". `FlowLearner` (every 10 min, last 24h of traces, skipping traces younger than
+5 min) groups traces by entry service and route and stores paths that at least 90% of at
+least 30 traces took as SUGGESTED (deadline = 3 x p95, min 2s); it never activates or
+re-suggests a rejected one. Only ACTIVE flows - approved by an editor or added by hand
+(`/api/process/flows`, `POST /api/process/flows/learn` to learn now) - are checked:
+each minute `IncidentDetector` reads the traces whose deadline passed in the window
+(`TraceReader`, one aggregation per environment) and opens a FLOW_BROKEN incident when
+at least `minTraces` were checked and `maxBrokenPercent` of them never arrived, arrived
+late or logged an error on the way; broken examples record where each one stopped.
+Pausing, rejecting or deleting a flow closes its incident. Depends entirely on services
+passing the trace id along (Monitoring access page shows which do).
+
+**Investigate with AI.** `POST /api/ai/incidents/{id}/investigate` (editors; ai-service) starts
+an investigation in the background and returns 202; the incident's `ai_investigation` shows
+RUNNING until `IncidentInvestigator` writes DONE/FAILED through
+`PUT /api/process/incidents/{id}/investigation`. The model gets the incident, the error logs
+around it, the trace of an error or of a broken request, the services, and the similar past
+incidents with the team's conclusions; with a provider that supports tool use (Anthropic) it
+also gets the chat agent's read-only tools to dig further. It answers JSON (summary, root
+cause, suggested fix, confidence, evidence) in the asker's language. It only proposes: the
+team's review stays separate, and the UI can copy the AI's answer into the review form.
+Counts against the same per-project daily cap as chat answers (`AgentQuota`). The chat agent
+also has `search_incident_library` and `get_incident` tools.
+
+Still no automatic process-discovery agent. It proves the pipeline (heartbeat → state → flow
 diagram) end to end; the real heartbeat-sending agent/sidecar for monitored
 services doesn't exist yet.
 
@@ -366,8 +418,9 @@ picks otherwise. `MEMBER`, stored before roles existed, is read as `EDITOR`.
 
 **API keys - how incoming data gets an owner.** A monitored service sends
 `X-Api-Key: msk_...`. A key belongs to one environment of one project, so it alone says where
-a log or heartbeat goes. The owner creates keys under Settings; a key is shown once, and only
-its SHA-256 is stored (`api_keys`, the hash is the id). A key can do exactly two things:
+a log or heartbeat goes. The owner creates keys under Settings. A key is looked up by its SHA-256
+(`api_keys`, the hash is the id) and also kept AES-GCM encrypted, so the owner can show or copy
+it again later (keys created before 2026-11-18 have only the hash and cannot be shown). A key can do exactly two things:
 `POST /api/logs` and `POST /api/process/heartbeat`. Removing an environment revokes its keys.
 
 **Where it is enforced: `api-gateway`** (`AuthInterceptor`, `ScopeResolver`). For every

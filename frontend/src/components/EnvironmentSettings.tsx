@@ -5,6 +5,7 @@ import {
   createApiKey,
   fetchApiKeys,
   removeEnvironment,
+  revealApiKey,
   revokeApiKey,
   saveLlm,
   type LlmInput,
@@ -33,6 +34,9 @@ export default function EnvironmentSettings() {
   // The one moment a key's value exists on screen: right after it was created.
   const [created, setCreated] = useState<CreatedApiKey | null>(null);
   const [copied, setCopied] = useState(false);
+  // Keys the owner chose to show again, by id (only in this page's memory).
+  const [revealed, setRevealed] = useState<Record<string, string>>({});
+  const [copiedId, setCopiedId] = useState<string | null>(null);
   // Optional: the new environment gets its own AI model key instead of the project's.
   const [ownModel, setOwnModel] = useState(false);
   const [model, setModel] = useState<LlmInput>(() => emptyLlmInput());
@@ -121,6 +125,30 @@ export default function EnvironmentSettings() {
     }, t.environments.keyFailed);
   }
 
+  function toggleReveal(key: ApiKeyInfo) {
+    if (!projectId) return;
+    if (revealed[key.id]) {
+      setRevealed(({ [key.id]: _, ...rest }) => rest);
+      return;
+    }
+    void run(async () => {
+      const value = await revealApiKey(projectId, key.id);
+      setRevealed((prev) => ({ ...prev, [key.id]: value }));
+    }, t.environments.revealFailed);
+  }
+
+  async function copyKey(key: ApiKeyInfo) {
+    if (!projectId) return;
+    try {
+      const value = revealed[key.id] ?? (await revealApiKey(projectId, key.id));
+      await navigator.clipboard.writeText(value);
+      setCopiedId(key.id);
+      window.setTimeout(() => setCopiedId((id) => (id === key.id ? null : id)), 2000);
+    } catch {
+      setError(t.environments.revealFailed);
+    }
+  }
+
   async function handleCopy() {
     if (!created) return;
     try {
@@ -185,12 +213,13 @@ export default function EnvironmentSettings() {
                       value={created.key}
                     />
                     <button
-                      className="shrink-0 flex items-center gap-1 px-space-md py-space-sm btn btn-secondary"
+                      className="shrink-0 w-8 h-8 flex items-center justify-center rounded-lg text-on-surface-variant hover:text-on-surface hover:bg-surface-container-high transition-colors"
                       onClick={handleCopy}
+                      title={copied ? t.team.copied : t.team.copy}
+                      aria-label={copied ? t.team.copied : t.team.copy}
                       type="button"
                     >
-                      <Icon name={copied ? "check" : "content_copy"} size={16} />
-                      {copied ? t.team.copied : t.team.copy}
+                      <Icon name={copied ? "check" : "content_copy"} size={18} className={copied ? "text-secondary" : ""} />
                     </button>
                   </div>
                 </div>
@@ -200,17 +229,53 @@ export default function EnvironmentSettings() {
                 <ul className="flex flex-col gap-1">
                   {environmentKeys.map((key) => (
                     <li key={key.id} className="flex items-center justify-between gap-space-md">
-                      <span className="font-code text-code-sm text-on-surface-variant">
-                        {key.prefix}… · {new Date(key.createdAt).toLocaleDateString()}
+                      <span className="min-w-0 font-code text-code-sm text-on-surface-variant break-all" dir="ltr">
+                        {revealed[key.id] ? (
+                          <span className="text-on-surface select-all">{revealed[key.id]}</span>
+                        ) : (
+                          <>
+                            {key.prefix}… · {new Date(key.createdAt).toLocaleDateString()}
+                          </>
+                        )}
                       </span>
-                      <button
-                        className="font-body-sm text-body-sm text-on-surface-variant hover:text-error transition-colors disabled:opacity-40"
-                        onClick={() => handleRevoke(key)}
-                        disabled={busy}
-                        type="button"
-                      >
-                        {t.environments.revoke}
-                      </button>
+                      <div className="flex items-center gap-space-sm shrink-0">
+                        {key.revealable ? (
+                          <>
+                            <button
+                              className="flex items-center gap-1 font-body-sm text-body-sm text-on-surface-variant hover:text-on-surface transition-colors disabled:opacity-40"
+                              onClick={() => toggleReveal(key)}
+                              disabled={busy}
+                              title={revealed[key.id] ? t.environments.hideKey : t.environments.showKey}
+                              type="button"
+                            >
+                              <Icon name={revealed[key.id] ? "visibility_off" : "visibility"} size={16} />
+                              {revealed[key.id] ? t.environments.hideKey : t.environments.showKey}
+                            </button>
+                            <button
+                              className="w-7 h-7 flex items-center justify-center rounded-lg text-on-surface-variant hover:text-on-surface hover:bg-surface-container-high transition-colors"
+                              onClick={() => void copyKey(key)}
+                              title={copiedId === key.id ? t.team.copied : t.team.copy}
+                              aria-label={copiedId === key.id ? t.team.copied : t.team.copy}
+                              type="button"
+                            >
+                              <Icon name={copiedId === key.id ? "check" : "content_copy"} size={16} className={copiedId === key.id ? "text-secondary" : ""} />
+                            </button>
+                          </>
+                        ) : (
+                          <span className="font-body-sm text-body-sm text-on-surface-variant" title={t.environments.notRevealable}>
+                            {t.environments.notRevealableShort}
+                          </span>
+                        )}
+                        <button
+                          className="font-body-sm text-body-sm text-on-surface-variant hover:text-error transition-colors disabled:opacity-40"
+                          onClick={() => handleRevoke(key)}
+                          disabled={busy}
+                          title={t.environments.revokeHint}
+                          type="button"
+                        >
+                          {t.environments.revoke}
+                        </button>
+                      </div>
                     </li>
                   ))}
                 </ul>
