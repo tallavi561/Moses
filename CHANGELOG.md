@@ -6,6 +6,21 @@ Versions follow [semver](https://semver.org): a new feature bumps the minor vers
 patch version, and a breaking change to an API that monitored services or the SKILL use bumps
 the major version. The running version is shown at the bottom of the sidebar.
 
+## [1.3.0] - 2026-11-22
+
+### Added
+- MoSes can be installed on a phone's home screen as a web app, with the eagle icon: a web app
+  manifest, icons (including an Android "maskable" one) and a service worker that caches nothing,
+  so data is always live. On Android a banner offers "Install" (the browser's own install dialog);
+  on iPhone it explains Share > Add to Home Screen. Not shown once installed, on desktops, or for
+  two weeks after "Not now". Installing needs the site on HTTPS (or localhost).
+
+### Changed
+- The iPhone home-screen icon is a full square tile (iOS rounds it; transparent corners showed black).
+
+### Known issues
+- The layout isn't adapted to phone screens yet: the sidebar takes most of the width.
+
 ## [1.2.0] - 2026-11-22
 
 ### Added

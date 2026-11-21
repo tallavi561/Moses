@@ -4,7 +4,12 @@ Builds the web assets for the animated logo from frontend/resources/*.gif.
   frontend/src/assets/logo-sprite.png   all frames side by side (square cells), played once by CSS
   frontend/public/favicon.png           last frame on a light rounded tile (black art is invisible
                                         on dark browser tabs otherwise)
-  frontend/public/apple-touch-icon.png  same, 180px
+  frontend/public/apple-touch-icon.png  last frame on a full square light tile, 180px (iOS rounds
+                                        the corners itself; transparent corners would turn black)
+  frontend/public/icon-192.png,
+  frontend/public/icon-512.png          web-app (PWA) icons: rounded light tile, like the favicon
+  frontend/public/icon-maskable-512.png Android "maskable" icon: full-bleed tile, art inside the
+                                        central 60% safe zone so any mask shape keeps it whole
 
 Why a sprite instead of the GIF itself: browsers can't stop a GIF from JavaScript, and the GIF's
 loop flag is handled inconsistently. A sprite + CSS steps() plays exactly once and holds the last
@@ -85,7 +90,25 @@ def on_tile(cell, size):
     return tile
 
 
+def square_at(frame, size):
+    """The frame cropped like the sprite cells, but resized straight from the source (sharp at 512)."""
+    canvas = Image.new("RGBA", (crop[2] - crop[0], crop[3] - crop[1]), (0, 0, 0, 0))
+    canvas.paste(frame, (-crop[0], -crop[1]))
+    return canvas.resize((size, size), Image.LANCZOS)
+
+
+def full_tile(frame, size, art_share):
+    """Opaque square tile with the art centered at art_share of its side."""
+    tile = Image.new("RGBA", (size, size), TILE)
+    inner = int(size * art_share)
+    tile.alpha_composite(square_at(frame, inner), ((size - inner) // 2, (size - inner) // 2))
+    return tile
+
+
 public = ROOT / "frontend" / "public"
 on_tile(cells[-1], 128).save(public / "favicon.png", optimize=True)
-on_tile(cells[-1], 180).save(public / "apple-touch-icon.png", optimize=True)
-print("favicon + apple-touch-icon written")
+full_tile(frames[-1], 180, 0.84).convert("RGB").save(public / "apple-touch-icon.png", optimize=True)
+on_tile(square_at(frames[-1], 512), 192).save(public / "icon-192.png", optimize=True)
+on_tile(square_at(frames[-1], 512), 512).save(public / "icon-512.png", optimize=True)
+full_tile(frames[-1], 512, 0.6).convert("RGB").save(public / "icon-maskable-512.png", optimize=True)
+print("favicon, apple-touch-icon and web-app icons written")

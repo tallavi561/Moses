@@ -16,6 +16,7 @@ import DashboardPage from "./pages/DashboardPage";
 import CoveragePage from "./pages/CoveragePage";
 import IncidentsPage from "./pages/IncidentsPage";
 import ComingSoonPage from "./pages/ComingSoonPage";
+import InstallPrompt from "./components/InstallPrompt";
 import "./App.css";
 
 export default function App() {
@@ -48,6 +49,7 @@ export default function App() {
 
               <Route path="*" element={<Navigate to="/projects" replace />} />
             </Routes>
+            <InstallPrompt />
           </ProjectsProvider>
         </AuthProvider>
       </LanguageProvider>

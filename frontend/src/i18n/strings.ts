@@ -4,6 +4,13 @@ export const strings = {
   en: {
     appName: "MoSes Monitor",
     appTagline: "Smart log & process monitoring",
+    install: {
+      title: "Install MoSes on your phone",
+      body: "Open it from the home screen like an app - full screen, one tap away.",
+      button: "Install",
+      later: "Not now",
+      iosSteps: "In Safari, tap Share {share} and then \"Add to Home Screen\".",
+    },
     nav: {
       chat: "Chat",
       search: "Search",
@@ -567,6 +574,13 @@ export const strings = {
   he: {
     appName: "MoSes Monitor",
     appTagline: "ניטור לוגים ותהליכים חכם",
+    install: {
+      title: "התקינו את MoSes בטלפון",
+      body: "פתיחה ממסך הבית כמו אפליקציה - מסך מלא, בלחיצה אחת.",
+      button: "התקן",
+      later: "לא עכשיו",
+      iosSteps: "ב-Safari הקישו על שיתוף {share} ואז על \"הוספה למסך הבית\".",
+    },
     nav: {
       chat: "צ'אט",
       search: "חיפוש",
