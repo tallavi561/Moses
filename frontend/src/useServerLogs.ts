@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import { searchLogPage, type LogEntry } from "./api";
+import { DEFAULT_RANGE, isLive, resolveRange, type TimeRange } from "./timeRange";
 
 /** Logs fetched per request. A page on screen is smaller, so one request covers several pages. */
 export const CHUNK_SIZE = 100;
@@ -7,6 +8,8 @@ export const CHUNK_SIZE = 100;
 export interface ServerQuery {
   words: string[];
   services?: string[];
+  /** Which time window to search (default: the last 24 hours). */
+  range?: TimeRange;
   /** Bump to force a fresh load of an otherwise identical query. */
   nonce?: number;
 }
@@ -18,7 +21,6 @@ interface Data {
 }
 
 const EMPTY: Data = { logs: [], hasMore: false, loaded: false };
-const DAY_MS = 24 * 60 * 60 * 1000;
 
 function isOlder(a: LogEntry, b: LogEntry): boolean {
   const ta = Date.parse(a.timestamp);
@@ -44,7 +46,7 @@ export function useServerLogs(query: ServerQuery | null) {
   dataRef.current = data;
   const genRef = useRef(0);
   const busyRef = useRef(false);
-  const fromRef = useRef("");
+  const windowRef = useRef({ from: "", to: "" });
 
   const run = useCallback(async (mode: "first" | "more" | "refresh") => {
     const q = queryRef.current;
@@ -52,8 +54,12 @@ export function useServerLogs(query: ServerQuery | null) {
     if (mode !== "refresh" && busyRef.current) return;
 
     const gen = genRef.current;
-    const now = Date.now();
-    if (mode === "first") fromRef.current = new Date(now - DAY_MS).toISOString();
+    const range = q.range ?? DEFAULT_RANGE;
+    // A window that ended in the past can't gain new logs: nothing to refresh.
+    if (mode === "refresh" && !isLive(range)) return;
+    // Pages after the first keep the window of the first load, so they continue the same list.
+    if (mode === "first") windowRef.current = resolveRange(range);
+    const window = mode === "refresh" ? resolveRange(range) : windowRef.current;
     const last = mode === "more" ? dataRef.current.logs[dataRef.current.logs.length - 1] : undefined;
     if (mode === "more" && !last) return;
 
@@ -65,8 +71,8 @@ export function useServerLogs(query: ServerQuery | null) {
       const page = await searchLogPage({
         words: q.words,
         services: q.services,
-        from: mode === "refresh" ? new Date(now - DAY_MS).toISOString() : fromRef.current,
-        to: new Date(now).toISOString(),
+        from: window.from,
+        to: window.to,
         before: last?.timestamp,
         beforeId: last?.logId,
         limit: CHUNK_SIZE,

@@ -6,6 +6,15 @@ Versions follow [semver](https://semver.org): a new feature bumps the minor vers
 patch version, and a breaking change to an API that monitored services or the SKILL use bumps
 the major version. The running version is shown at the bottom of the sidebar.
 
+## [1.2.0] - 2026-11-22
+
+### Added
+- Search: a time range for logs - quick ranges (15 minutes to 14 days) or a custom range from a
+  date and time to another (or until now), in local time. The range is in the URL (`?range=` or
+  `?from=&to=`), so a search can be shared. Logs are kept 14 days, so earlier starts are refused
+  with an explanation. A fixed past range doesn't auto-refresh; ranges ending now still do.
+- An incident's "service logs" link opens Search on the incident's time (5 minutes before and after).
+
 ## [1.1.0] - 2026-11-22
 
 ### Added

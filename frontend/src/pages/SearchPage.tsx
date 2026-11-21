@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { useSearchParams } from "react-router-dom";
 import { askAi, fetchProcessState, type AiInterpretation, type LogEntry } from "../api";
 import { useLanguage, pluralize } from "../i18n/LanguageContext";
@@ -8,6 +8,8 @@ import { LEVEL_CLASS, LEVEL_LABEL } from "../logLevels";
 import TraceView from "../components/TraceView";
 import InfoHint from "../components/InfoHint";
 import ServiceMultiSelect from "../components/ServiceMultiSelect";
+import TimeRangePicker from "../components/TimeRangePicker";
+import { DEFAULT_RANGE, rangeFromParams, rangeToParams, type TimeRange } from "../timeRange";
 
 const PAGE_SIZE = 20;
 const FEED_REFRESH_MS = 10000;
@@ -299,8 +301,6 @@ type SearchMode = "structured" | "ai";
 
 const SEARCH_MODE_KEY = "moses.search.mode";
 
-const FEED_QUERY: ServerQuery = { words: [] };
-
 export default function SearchPage() {
   const { t } = useLanguage();
   const [searchMode, setSearchMode] = useState<SearchMode>(() => {
@@ -324,23 +324,38 @@ export default function SearchPage() {
   const [resultsView, setResultsView] = useState<"json" | "table">("json");
   const [traceId, setTraceId] = useState<string | null>(null);
 
-  const feed = useServerLogs(FEED_QUERY);
+  // The time window lives in the URL (?range=60 or ?from=..&to=..), so a search can be shared.
+  const [searchParams, setSearchParams] = useSearchParams();
+  const range: TimeRange = useMemo(() => rangeFromParams(searchParams) ?? DEFAULT_RANGE, [searchParams]);
+  const rangeKey = JSON.stringify(range);
+  const feedQuery = useMemo<ServerQuery>(() => ({ words: [], range: JSON.parse(rangeKey) }), [rangeKey]);
+  const feed = useServerLogs(feedQuery);
   const search = useServerLogs(structuredQuery);
 
-  // Deep links from other pages (e.g. an incident): ?trace=<id> opens that trace,
-  // ?service=<name> runs a search for that service's logs.
-  const [searchParams] = useSearchParams();
+  function changeRange(next: TimeRange) {
+    setSearchParams((prev) => rangeToParams(next, prev), { replace: true });
+  }
+
+  // A search already on screen follows a new time range.
   useEffect(() => {
-    const trace = searchParams.get("trace");
-    const service = searchParams.get("service");
-    if (trace) {
-      setTraceId(trace);
-    } else if (service) {
-      setServiceFilter([service]);
+    setStructuredQuery((q) => (q ? { ...q, range: JSON.parse(rangeKey), nonce: Date.now() } : q));
+  }, [rangeKey]);
+
+  // Deep links from other pages (e.g. an incident): ?trace=<id> opens that trace,
+  // ?service=<name> runs a search for that service's logs (in the link's time range, if any).
+  const traceParam = searchParams.get("trace");
+  const serviceParam = searchParams.get("service");
+  useEffect(() => {
+    if (traceParam) {
+      setTraceId(traceParam);
+    } else if (serviceParam) {
+      setServiceFilter([serviceParam]);
       setLastMode("structured");
-      setStructuredQuery({ words: [], services: [service], nonce: Date.now() });
+      setStructuredQuery({ words: [], services: [serviceParam], range: JSON.parse(rangeKey), nonce: Date.now() });
     }
-  }, [searchParams]);
+    // Only when the link itself changes; range changes are handled above.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [traceParam, serviceParam]);
 
   useEffect(() => {
     fetchProcessState()
@@ -372,7 +387,7 @@ export default function SearchPage() {
     setError(null);
     setLastMode("structured");
     setAiResults(null);
-    setStructuredQuery({ words, services: serviceFilter.length ? serviceFilter : undefined, nonce: Date.now() });
+    setStructuredQuery({ words, services: serviceFilter.length ? serviceFilter : undefined, range, nonce: Date.now() });
   }
 
   async function runNlQuery() {
@@ -525,6 +540,9 @@ export default function SearchPage() {
                 <Icon name="search" size={18} />
                 {t.search.searchButton}
               </button>
+            </div>
+            <div className="mt-space-sm">
+              <TimeRangePicker key={rangeKey} value={range} onChange={changeRange} />
             </div>
           </>
         ) : (

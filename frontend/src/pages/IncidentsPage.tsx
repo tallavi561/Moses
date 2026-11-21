@@ -250,6 +250,15 @@ const REVIEW_STYLE: Record<IncidentReview, string> = {
   UNREVIEWED: "bg-surface-container-high text-on-surface-variant",
 };
 
+/** Search link for an incident's service, around the incident's time (5 min before and after). */
+function incidentLogParams(i: Incident): string {
+  const params = new URLSearchParams({ service: i.serviceName });
+  const margin = 5 * 60_000;
+  params.set("from", new Date(Date.parse(i.openedAt) - margin).toISOString());
+  if (i.closedAt) params.set("to", new Date(Date.parse(i.closedAt) + margin).toISOString());
+  return params.toString();
+}
+
 interface CardProps {
   incident: Incident;
   onChanged: () => void;
@@ -407,7 +416,7 @@ function IncidentCard({ incident: given, onChanged, showEnvironment }: CardProps
 
       <div className="flex flex-wrap items-center gap-space-md">
         <Link
-          to={`../search?service=${encodeURIComponent(i.serviceName)}`}
+          to={`../search?${incidentLogParams(i)}`}
           relative="path"
           className="flex items-center gap-1 font-label-sm text-label-sm text-secondary hover:underline"
         >

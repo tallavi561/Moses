@@ -6,7 +6,7 @@
 
     <groupId>com.moses</groupId>
     <artifactId>moses-monitor-parent</artifactId>
-    <version>1.1.0</version>
+    <version>1.2.0</version>
     <packaging>pom</packaging>
     <name>moses-monitor-parent</name>
     <description>Aggregator for all MoSes monitoring microservices (build ordering only; each

@@ -13,7 +13,7 @@
 
     <groupId>com.moses</groupId>
     <artifactId>api-gateway</artifactId>
-    <version>1.1.0</version>
+    <version>1.2.0</version>
     <name>api-gateway</name>
     <description>Single public entry point for the React frontend: path-prefix reverse proxy to
         the internal services, plus CORS. A minimal hand-rolled proxy (RestTemplate-based) rather
