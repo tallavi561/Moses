@@ -13,7 +13,7 @@
 
     <groupId>com.moses</groupId>
     <artifactId>auth-service</artifactId>
-    <version>1.0.0</version>
+    <version>1.1.0</version>
     <name>auth-service</name>
     <description>Owns identity: user accounts (email + password), the signed tokens every other
         request carries, and projects with their members and invite links. A project's members

@@ -13,7 +13,7 @@
 
     <groupId>com.moses</groupId>
     <artifactId>ingestion-service</artifactId>
-    <version>1.0.0</version>
+    <version>1.1.0</version>
     <name>ingestion-service</name>
     <description>Owns all writes: receives logs via REST, tokenizes, buffers index updates in
         memory and bulk-flushes them, and owns data retention (TTL) for logs + index_buckets.</description>
@@ -26,7 +26,7 @@
         <dependency>
             <groupId>com.moses</groupId>
             <artifactId>monitor-common</artifactId>
-            <version>1.0.0</version>
+            <version>1.1.0</version>
         </dependency>
         <dependency>
             <groupId>org.springframework.boot</groupId>

@@ -87,6 +87,13 @@ export default function Sidebar({ state, onCollapseToggle, onHide }: SidebarProp
         <Icon name="left_panel_close" size={20} className="shrink-0" />
         {expanded && <span className="font-body text-body-md">Hide</span>}
       </button>
+      <span
+        dir="ltr"
+        className={`font-code text-[10px] text-on-surface-variant/60 ${expanded ? "px-space-md" : "text-center"}`}
+        title={`MoSes ${__APP_VERSION__}`}
+      >
+        v{__APP_VERSION__}
+      </span>
     </aside>
   );
 }
