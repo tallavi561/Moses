@@ -13,7 +13,7 @@
 
     <groupId>com.moses</groupId>
     <artifactId>chat-service</artifactId>
-    <version>1.3.0</version>
+    <version>1.3.1</version>
     <name>chat-service</name>
     <description>The project's team chat: stores messages, pushes them live over a WebSocket to
         every open client (web now, mobile app later), and hands messages addressed to the AI agent

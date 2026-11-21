@@ -13,7 +13,7 @@
 
     <groupId>com.moses</groupId>
     <artifactId>ai-service</artifactId>
-    <version>1.3.0</version>
+    <version>1.3.1</version>
     <name>ai-service</name>
     <description>SKELETON. Stateless orchestration layer: translates natural-language queries into
         structured calls to search-service, and (later) runs anomaly detection / summarization.

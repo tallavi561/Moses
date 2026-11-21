@@ -2,9 +2,25 @@
 
 Every change ships as a new version: the same number in the root `pom.xml`, every module's
 `pom.xml` and `frontend/package.json`, an entry here, and a git tag `vX.Y.Z`.
-Versions follow [semver](https://semver.org): a new feature bumps the minor version, a fix the
-patch version, and a breaking change to an API that monitored services or the SKILL use bumps
-the major version. The running version is shown at the bottom of the sidebar.
+Which number goes up:
+- **Patch** (1.3.0 -> 1.3.1) for small changes: fixes, UI improvements, redesigns of an existing
+  page, internal refactors that don't change an API.
+- **Minor** (1.3 -> 1.4) only for a substantial new capability.
+- **Major** (1 -> 2) only for a breaking change to an API that monitored services or the SKILL use.
+
+`python scripts/bump-version.py X.Y.Z` sets the number everywhere. The running version is shown
+at the bottom of the sidebar.
+
+## [1.3.1] - 2026-11-22
+
+### Fixed
+- Phones: the sidebar is a slide-in menu (menu button in the top bar; closes on navigation, a tap
+  outside or Esc) instead of taking most of the screen, and pages use the full width. The search
+  box gets its own row, the dashboard chart fits without sideways scrolling, and the Architecture
+  page opens on the list on phones (the graph is still one tap away). Desktop is unchanged.
+
+### Added
+- `scripts/bump-version.py` sets the version in every pom and in the frontend package files.
 
 ## [1.3.0] - 2026-11-22
 
@@ -17,9 +33,6 @@ the major version. The running version is shown at the bottom of the sidebar.
 
 ### Changed
 - The iPhone home-screen icon is a full square tile (iOS rounds it; transparent corners showed black).
-
-### Known issues
-- The layout isn't adapted to phone screens yet: the sidebar takes most of the width.
 
 ## [1.2.0] - 2026-11-22
 

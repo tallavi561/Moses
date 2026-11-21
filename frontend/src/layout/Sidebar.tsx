@@ -10,19 +10,24 @@ interface SidebarProps {
   state: SidebarState;
   onCollapseToggle: () => void;
   onHide: () => void;
+  /** Phone drawer: defined only on phones; whether the drawer is slid in. */
+  mobileOpen?: boolean;
 }
 
-export default function Sidebar({ state, onCollapseToggle, onHide }: SidebarProps) {
+export default function Sidebar({ state, onCollapseToggle, onHide, mobileOpen }: SidebarProps) {
   const { t } = useLanguage();
+  const mobile = mobileOpen !== undefined;
   const expanded = state === "expanded";
 
   if (state === "hidden") return null;
 
   return (
     <aside
-      className={`fixed left-0 top-0 h-full bg-surface-container-lowest/90 backdrop-blur-xl z-50 flex flex-col justify-between p-space-md shadow-bar transition-[width] duration-200 ${
-        expanded ? "w-72" : "w-20"
+      className={`fixed left-0 top-0 h-full bg-surface-container-lowest/95 backdrop-blur-xl z-50 flex flex-col justify-between p-space-md shadow-bar duration-200 ${
+        mobile ? `w-72 max-w-[85vw] transition-transform ${mobileOpen ? "translate-x-0" : "-translate-x-full"}` : `transition-[width] ${expanded ? "w-72" : "w-20"}`
       }`}
+      style={mobile ? { paddingTop: "max(1rem, env(safe-area-inset-top))", paddingBottom: "max(1rem, env(safe-area-inset-bottom))" } : undefined}
+      aria-hidden={mobile && !mobileOpen ? true : undefined}
     >
       <div className="flex flex-col gap-space-lg overflow-hidden">
         <div className="flex items-center justify-between px-space-sm py-space-xs">
@@ -30,11 +35,12 @@ export default function Sidebar({ state, onCollapseToggle, onHide }: SidebarProp
           {expanded && (
             <button
               className="text-on-surface-variant hover:text-on-surface transition-colors p-space-xs rounded-lg hover:bg-surface-container-high shrink-0"
-              onClick={onCollapseToggle}
-              title="Collapse"
+              onClick={mobile ? onHide : onCollapseToggle}
+              title={mobile ? "Close menu" : "Collapse"}
+              aria-label={mobile ? "Close menu" : "Collapse"}
               type="button"
             >
-              <Icon name="menu_open" size={18} />
+              <Icon name={mobile ? "close" : "menu_open"} size={18} />
             </button>
           )}
         </div>
@@ -79,7 +85,7 @@ export default function Sidebar({ state, onCollapseToggle, onHide }: SidebarProp
       </div>
 
       <button
-        className="flex items-center gap-space-sm px-space-md py-space-sm rounded-xl text-on-surface-variant hover:bg-surface-container-high hover:text-on-surface transition-all"
+        className={`${mobile ? "hidden" : "flex"} items-center gap-space-sm px-space-md py-space-sm rounded-xl text-on-surface-variant hover:bg-surface-container-high hover:text-on-surface transition-all`}
         onClick={onHide}
         title="Hide sidebar"
         type="button"

@@ -513,8 +513,8 @@ export default function SearchPage() {
             <p className="font-body-sm text-body-sm text-on-surface-variant mt-space-xs mb-space-md">
               {t.search.structuredHint}
             </p>
-            <div className="flex items-center gap-space-sm">
-              <div className="relative flex-1">
+            <div className="flex flex-wrap items-center gap-space-sm">
+              <div className="relative flex-1 basis-full sm:basis-auto min-w-0">
                 <Icon
                   name="terminal"
                   size={18}
@@ -551,8 +551,8 @@ export default function SearchPage() {
             <p className="font-body-sm text-body-sm text-on-surface-variant mt-space-xs mb-space-md">
               {t.search.nlHint}
             </p>
-            <div className="flex items-center gap-space-sm">
-              <div className="relative flex-1">
+            <div className="flex flex-wrap items-center gap-space-sm">
+              <div className="relative flex-1 basis-full sm:basis-auto min-w-0">
                 <Icon
                   name="auto_awesome"
                   size={18}

@@ -21,13 +21,14 @@ export default function TopBar({ sidebarState, onShowSidebar }: TopBarProps) {
     <header
       className={`fixed top-0 right-0 h-16 z-40 bg-surface-container-lowest/80 backdrop-blur-xl shadow-bar transition-[left] duration-200 ${LEFT[sidebarState]}`}
     >
-      <div className="h-16 w-full px-space-md flex items-center justify-between gap-space-md">
+      <div className="h-16 w-full px-space-sm sm:px-space-md flex items-center justify-between gap-space-md">
         <div>
           {sidebarState === "hidden" && (
             <button
               className="text-on-surface-variant hover:text-on-surface transition-colors p-space-xs rounded-lg hover:bg-surface-container-high"
               onClick={onShowSidebar}
               title="Show sidebar"
+              aria-label="Menu"
               type="button"
             >
               <Icon name="menu" size={20} />
@@ -43,7 +44,7 @@ export default function TopBar({ sidebarState, onShowSidebar }: TopBarProps) {
             type="button"
           >
             <Icon name="language" size={16} />
-            <span>{lang === "en" ? "English" : "עברית"}</span>
+            <span className="hidden sm:inline">{lang === "en" ? "English" : "עברית"}</span>
           </button>
           <UserMenu />
         </div>

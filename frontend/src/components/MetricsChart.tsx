@@ -217,7 +217,7 @@ export default function MetricsChart({
             ref={svgRef}
             viewBox={`0 0 ${WIDTH} ${HEIGHT}`}
             className="w-full h-auto"
-            style={{ minWidth: 480 }}
+            style={{ minWidth: 300 }}
             onMouseMove={handleMove}
             onMouseLeave={() => setHoverFrac(null)}
           >

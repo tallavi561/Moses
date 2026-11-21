@@ -22,6 +22,7 @@ import {
   type ConnectionDirection,
   type ProcessState,
 } from "../api";
+import { MOBILE_QUERY } from "../layout/useIsMobile";
 import { useLanguage } from "../i18n/LanguageContext";
 import { useProjects } from "../projects/ProjectsContext";
 import AddServiceForm from "../components/AddServiceForm";
@@ -105,7 +106,9 @@ export default function FlowPage() {
   const [view, setView] = useState<ViewMode>(() => {
     try {
       const stored = localStorage.getItem(viewKey);
-      return stored === "list" ? "list" : "graph";
+      if (stored === "list" || stored === "graph") return stored;
+      // A graph of boxes doesn't fit a phone: start phones on the list.
+      return window.matchMedia(MOBILE_QUERY).matches ? "list" : "graph";
     } catch {
       return "graph";
     }
@@ -281,7 +284,7 @@ export default function FlowPage() {
   const unknownCount = states.filter((s) => s.status === "UNKNOWN").length;
 
   return (
-    <div className="flex flex-col gap-space-md -mx-space-md -my-0 md:mx-0">
+    <div className="flex flex-col gap-space-md">
       <div className="bg-surface-container-lowest rounded-2xl shadow-sm px-space-md py-space-sm flex flex-col gap-space-sm">
         <div className="flex flex-col lg:flex-row lg:items-center lg:justify-between gap-space-sm">
           <div className="flex items-center gap-space-md">
