@@ -254,6 +254,160 @@ html[data-theme="light"] .hero-logo {
   box-shadow: var(--shadow-stage);
 }
 
+/*
+ * Sign-in page. The brand panel is always dark (it is the logo's stage, in both themes); the form
+ * side follows the theme.
+ */
+.login-brand {
+  background:
+    radial-gradient(60% 50% at 50% 38%, rgba(76, 215, 246, 0.10), transparent 70%),
+    radial-gradient(40% 35% at 85% 95%, rgba(225, 29, 72, 0.10), transparent 70%),
+    #0b0c10;
+}
+.login-brand__grid {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  background-image:
+    linear-gradient(rgba(255, 255, 255, 0.035) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(255, 255, 255, 0.035) 1px, transparent 1px);
+  background-size: 44px 44px;
+  -webkit-mask-image: radial-gradient(ellipse at 50% 40%, #000 30%, transparent 75%);
+  mask-image: radial-gradient(ellipse at 50% 40%, #000 30%, transparent 75%);
+}
+/* The panel is already the dark stage: no second stage box around the logo on the light theme. */
+html[data-theme="light"] .login-brand .hero-logo {
+  background: none;
+  box-shadow: none;
+}
+.login-brand .hero-logo {
+  width: min(80vw, 420px, 34vh);
+}
+@media (min-width: 1024px) {
+  .login-brand .hero-logo {
+    width: min(38vw, 560px, 42vh);
+  }
+}
+.login-field {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  height: 3rem;
+  padding-inline: 0.875rem;
+  border-radius: 0.75rem;
+  background: var(--surface-container-high);
+  border: 1px solid var(--outline-variant);
+  transition: border-color 0.15s, box-shadow 0.15s;
+}
+.login-field:focus-within {
+  border-color: var(--secondary);
+  box-shadow: 0 0 0 3px color-mix(in srgb, var(--secondary) 22%, transparent);
+}
+.login-input {
+  flex: 1;
+  min-width: 0;
+  height: 100%;
+  background: transparent;
+  outline: none;
+  color: var(--on-surface);
+  font-size: 15px;
+}
+.login-input::placeholder {
+  color: var(--on-surface-variant);
+  opacity: 0.6;
+}
+/* "MoSes" unfolding into "Monitoring Services" (NameMorph). */
+.name-morph {
+  position: relative;
+  height: 2.1em;
+  line-height: 2.1em;
+  /* Inter: one family with real light and extra-bold weights, which is all that marks MoSes. */
+  font-family: Inter, sans-serif;
+  font-size: clamp(26px, 3.4vw, 50px);
+  font-weight: 300;
+  color: #f1f0f5;
+  white-space: nowrap;
+  text-align: center;
+}
+.name-morph__word {
+  display: inline-block;
+  transition: transform 0.9s cubic-bezier(0.2, 0.8, 0.2, 1);
+}
+.name-morph--whole .name-morph__word {
+  transform: scale(1.5);
+}
+/* One color for the whole name: MoSes stands out by weight only. */
+.name-morph__kept {
+  font-weight: 800;
+}
+.name-morph__space {
+  display: inline-block;
+  width: 0.3em;
+  transition: width 0.7s cubic-bezier(0.34, 1.56, 0.64, 1);
+}
+.name-morph--whole .name-morph__space {
+  width: 0;
+}
+.name-morph__letter {
+  position: relative;
+  font-size: 0;
+  opacity: 0;
+  transition:
+    font-size 0.38s cubic-bezier(0.2, 0.8, 0.2, 1),
+    opacity 0.3s ease-out;
+}
+.name-morph__letter--in {
+  font-size: 1em;
+  opacity: 1;
+}
+.name-morph__caret {
+  position: absolute;
+  right: -0.04em;
+  bottom: 0.12em;
+  width: 0.05em;
+  height: 0.95em;
+  background: #4cd7f6;
+  box-shadow: 0 0 10px #4cd7f6;
+  animation: typed-caret-blink 0.7s step-end infinite;
+}
+/* The finish: a line of light drawn from the middle outwards. */
+.name-morph::after {
+  content: "";
+  position: absolute;
+  left: 50%;
+  bottom: 0.18em;
+  width: 10.5em;
+  max-width: 100%;
+  height: 2px;
+  background: linear-gradient(90deg, transparent, #4cd7f6, transparent);
+  transform: translateX(-50%) scaleX(0);
+  transition: transform 0.9s ease-out;
+}
+.name-morph--done::after {
+  transform: translateX(-50%) scaleX(1);
+}
+@media (prefers-reduced-motion: reduce) {
+  .name-morph *,
+  .name-morph::after {
+    transition: none;
+    animation: none;
+  }
+}
+.typed-caret {
+  display: inline-block;
+  width: 0.07em;
+  height: 0.85em;
+  margin-inline-start: 0.08em;
+  vertical-align: -0.1em;
+  background: #4cd7f6;
+  animation: typed-caret-blink 1.05s step-end infinite;
+}
+@keyframes typed-caret-blink {
+  50% { opacity: 0; }
+}
+@media (prefers-reduced-motion: reduce) {
+  .typed-caret { animation: none; }
+}
 /* The intro and the idle loop overlap; only one may be visible (both are blended with the page). */
 .hero-logo__hidden {
   visibility: hidden;

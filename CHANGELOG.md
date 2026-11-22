@@ -11,6 +11,18 @@ Which number goes up:
 `python scripts/bump-version.py X.Y.Z` sets the number everywhere. The running version is shown
 at the bottom of the sidebar.
 
+## [1.3.3] - 2026-11-22
+
+### Changed
+- New sign-in page: a dark brand panel beside a clear form (labels above the fields, show password,
+  inline errors, language and theme switches). Under the eagle the name unfolds from MoSes through
+  Mo Ses and Mon Sers into Monitoring Services, with the letters of MoSes in bold, and then the
+  headline types itself. With reduced motion both appear at once.
+
+### Fixed
+- The headline font (Plus Jakarta Sans) and the code font (JetBrains Mono) never loaded: the Google
+  Fonts link asked for weights they don't have, and those families were silently left out.
+
 ## [1.3.2] - 2026-11-22
 
 ### Security
