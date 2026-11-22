@@ -11,6 +11,17 @@ Which number goes up:
 `python scripts/bump-version.py X.Y.Z` sets the number everywhere. The running version is shown
 at the bottom of the sidebar.
 
+## [1.3.2] - 2026-11-22
+
+### Security
+- The agent's git no longer uses the credentials of the machine MoSes runs on. A project's
+  repository URL is typed by a user, so on a host with saved git credentials a private repository
+  could have been cloned and read through the agent. Git now runs anonymously: no credential
+  helper, git config (except HTTPS trust settings), .netrc, askpass or inherited secrets. Only
+  public repositories can be read, as documented.
+- Clones cached by earlier versions are no longer read (new ones go in `repos/anonymous`). On a
+  host that ran an earlier version, delete the other folders in the repository cache.
+
 ## [1.3.1] - 2026-11-22
 
 ### Fixed

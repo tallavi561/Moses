@@ -16,7 +16,9 @@ import java.security.NoSuchAlgorithmException;
 import java.util.ArrayList;
 import java.util.HexFormat;
 import java.util.List;
+import java.util.Locale;
 import java.util.Map;
+import java.util.Set;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.TimeUnit;
 import java.util.regex.Pattern;
@@ -27,7 +29,9 @@ import java.util.regex.Pattern;
  * shell; nothing here can change the repository or reach anything but the clone.
  *
  * Only https://github.com URLs are accepted, so a project setting can never point the agent at
- * a folder on this machine.
+ * a folder on this machine. And git runs anonymously (see {@link #isolate}): any user can type a
+ * repository URL, so it must never be fetched with the credentials of the machine MoSes runs on -
+ * that is what makes "public repositories only" true.
  */
 @Component
 public class RepoReader {
@@ -46,17 +50,37 @@ public class RepoReader {
     private static final int MAX_LINE_CHARS = 300;
     private static final int MAX_DIFF_CHARS = 20_000;
 
+    /**
+     * All that git inherits from this process's environment. Everything else is dropped: tokens,
+     * askpass programs, GIT_* overrides and MoSes's own secrets.
+     */
+    private static final Set<String> KEPT_ENV = Set.of("PATH", "PATHEXT", "SYSTEMROOT", "WINDIR", "COMSPEC",
+            "TEMP", "TMP", "TMPDIR", "LANG", "LC_ALL", "HTTPS_PROXY", "HTTP_PROXY", "ALL_PROXY", "NO_PROXY",
+            "SSL_CERT_FILE", "SSL_CERT_DIR");
+    /**
+     * The only settings taken from the machine's git config: how to trust HTTPS. Git for Windows
+     * keeps its CA bundle there, so ignoring that config entirely breaks public clones too.
+     */
+    private static final List<String> TLS_SETTINGS = List.of("http.sslBackend", "http.sslCAInfo", "http.sslCAPath");
+
     /** A repository ready to read: where its clone is and how to link to it on GitHub. */
     public record Repo(Path dir, String webUrl, String branch) { }
 
     private final Path cacheRoot;
+    private final Path noHome;
+    private volatile List<String> tlsArgs;
     private final Map<String, Object> locks = new ConcurrentHashMap<>();
     private final Map<String, Long> lastFetch = new ConcurrentHashMap<>();
 
     public RepoReader(@Value("${moses.agent.repo-cache-dir:}") String cacheDir) {
-        this.cacheRoot = cacheDir == null || cacheDir.isBlank()
+        Path base = (cacheDir == null || cacheDir.isBlank()
                 ? Path.of(System.getProperty("user.home"), ".moses", "repos")
-                : Path.of(cacheDir);
+                : Path.of(cacheDir)).toAbsolutePath();
+        // A folder of its own: clones made before 1.3.2 may hold private repositories fetched with
+        // the host's credentials, and must never be served again.
+        this.cacheRoot = base.resolve("anonymous");
+        // Stands in for the home directory and is never created: no .gitconfig, .netrc or cookies.
+        this.noHome = base.resolve("no-home");
     }
 
     public static boolean isAcceptedUrl(String url) {
@@ -188,15 +212,55 @@ public class RepoReader {
 
     private record Result(int exit, String out) { }
 
-    private static Result git(Path dir, int timeoutSeconds, String... args) throws IOException {
-        List<String> command = new ArrayList<>();
-        command.add("git");
+    /** The git command line up to the subcommand. */
+    List<String> baseCommand() throws IOException {
+        List<String> command = new ArrayList<>(List.of("git", "-c", "credential.helper="));
+        command.addAll(tlsArgs());
+        return command;
+    }
+
+    private List<String> tlsArgs() throws IOException {
+        if (tlsArgs == null) {
+            List<String> found = new ArrayList<>();
+            for (String key : TLS_SETTINGS) {
+                // Read with the host's config on purpose: these keys say whom to trust, not who we are.
+                Result r = run(new ProcessBuilder("git", "config", "--get", key), 10, "config");
+                if (r.exit() == 0 && !r.out().isBlank()) {
+                    found.add("-c");
+                    found.add(key + "=" + r.out().trim());
+                }
+            }
+            tlsArgs = List.copyOf(found);
+        }
+        return tlsArgs;
+    }
+
+    /** Turns a child process environment into an anonymous one: no identity of the host reaches git. */
+    void isolate(Map<String, String> env) {
+        env.keySet().removeIf(name -> !KEPT_ENV.contains(name.toUpperCase(Locale.ROOT)));
+        env.put("HOME", noHome.toString());
+        env.put("USERPROFILE", noHome.toString());
+        env.put("XDG_CONFIG_HOME", noHome.toString());
+        env.put("GIT_CONFIG_NOSYSTEM", "1");
+        env.put("GIT_CONFIG_GLOBAL", noHome.resolve("gitconfig").toString());
+        env.put("GIT_TERMINAL_PROMPT", "0");
+        env.put("GIT_ASKPASS", "");
+        env.put("GCM_INTERACTIVE", "never");
+        env.put("GIT_ALLOW_PROTOCOL", "https");
+    }
+
+    private Result git(Path dir, int timeoutSeconds, String... args) throws IOException {
+        List<String> command = baseCommand();
         if (dir != null) {
             command.add("--git-dir=" + dir);
         }
         command.addAll(List.of(args));
         ProcessBuilder pb = new ProcessBuilder(command);
-        pb.environment().put("GIT_TERMINAL_PROMPT", "0");
+        isolate(pb.environment());
+        return run(pb, timeoutSeconds, args[0]);
+    }
+
+    private static Result run(ProcessBuilder pb, int timeoutSeconds, String what) throws IOException {
         pb.redirectErrorStream(false);
         pb.redirectError(ProcessBuilder.Redirect.DISCARD);
         pb.redirectInput(ProcessBuilder.Redirect.from(nullDevice()));
@@ -208,7 +272,7 @@ public class RepoReader {
         try {
             if (!process.waitFor(timeoutSeconds, TimeUnit.SECONDS)) {
                 process.destroyForcibly();
-                throw new IOException("git " + args[0] + " timed out");
+                throw new IOException("git " + what + " timed out");
             }
         } catch (InterruptedException e) {
             Thread.currentThread().interrupt();
