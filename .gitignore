@@ -13,5 +13,9 @@ frontend/dist/
 ~$*.docx
 scripts/keepalive.log
 
+# Test runs
+e2e/.out/
+__pycache__/
+
 # Local secrets/keys - never commit
 secrets/

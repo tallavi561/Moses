@@ -254,6 +254,11 @@ services doesn't exist yet.
 
 ## 7. What's verified vs. not
 
+**Automated (since 1.3.4):** unit tests, the end-to-end suites in `e2e/` against all seven services
+with a fake model, and the frontend build, run by `.github/workflows/ci.yml`. Not automated: real
+models, the browser UI, the Docker images and deployment (see `e2e/README.md`). The rest of this
+section records the manual verification of the first version.
+
 **Verified end-to-end** (both locally and on the live Render deployment - see
 §8): ingest a log → search finds it (structured search), NL query → AI service
 → search-service → UI, process heartbeat → flow diagram renders live state. All

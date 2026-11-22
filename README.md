@@ -34,6 +34,16 @@ java -jar api-gateway/target/api-gateway.jar &
 cd frontend && npm install && npm run dev
 ```
 
+## Testing
+
+```bash
+mvn package            # builds and runs the unit tests
+python e2e/run.py      # end-to-end: a separate stack, a throwaway database, a fake AI model
+```
+
+Both run in CI on every branch push and pull request, with the frontend build. See
+[e2e/README.md](e2e/README.md).
+
 ## Deployment
 
 `render.yaml` deploys all 6 services to [Render](https://render.com). Requires an

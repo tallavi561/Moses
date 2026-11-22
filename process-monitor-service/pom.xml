@@ -13,7 +13,7 @@
 
     <groupId>com.moses</groupId>
     <artifactId>process-monitor-service</artifactId>
-    <version>1.3.3</version>
+    <version>1.3.4</version>
     <name>process-monitor-service</name>
     <description>SKELETON. Will own process/system-health telemetry (distinct from log text) and
         expose the current service/process topology that the React flow diagram renders.</description>

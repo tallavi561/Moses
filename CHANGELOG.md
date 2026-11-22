@@ -11,6 +11,15 @@ Which number goes up:
 `python scripts/bump-version.py X.Y.Z` sets the number everywhere. The running version is shown
 at the bottom of the sidebar.
 
+## [1.3.4] - 2026-11-22
+
+### Added
+- End-to-end tests in the repository (`python e2e/run.py`): 11 suites, 197 checks, on a stack of
+  their own with a throwaway database and a fake AI model. A failed, missing or crashed check fails
+  the run.
+- CI (GitHub Actions) on every branch push and pull request: unit tests, end-to-end tests and the
+  frontend build, with no secrets.
+
 ## [1.3.3] - 2026-11-22
 
 ### Changed
